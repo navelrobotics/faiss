@@ -101,12 +101,8 @@ StandardGpuResourcesImpl::~StandardGpuResourcesImpl() {
   for (auto& entry : defaultStreams_) {
     DeviceScope scope(entry.first);
 
-    auto it = userDefaultStreams_.find(entry.first);
-    if (it == userDefaultStreams_.end()) {
-      // The user did not specify this stream, thus we are the ones
-      // who have created it
-      CUDA_VERIFY(cudaStreamDestroy(entry.second));
-    }
+    // We created these streams, so are responsible for destroying them
+    CUDA_VERIFY(cudaStreamDestroy(entry.second));
   }
 
   for (auto& entry : alternateStreams_) {
@@ -210,14 +206,12 @@ StandardGpuResourcesImpl::setPinnedMemory(size_t size) {
 
 void
 StandardGpuResourcesImpl::setDefaultStream(int device, cudaStream_t stream) {
-  auto it = defaultStreams_.find(device);
-  if (it != defaultStreams_.end()) {
-    // Replace this stream with the user stream
-    CUDA_VERIFY(cudaStreamDestroy(it->second));
-    it->second = stream;
-  }
-
   userDefaultStreams_[device] = stream;
+}
+
+void
+StandardGpuResourcesImpl::revertDefaultStream(int device) {
+  userDefaultStreams_.erase(device);
 }
 
 void
@@ -274,14 +268,8 @@ StandardGpuResourcesImpl::initializeForDevice(int device) {
 
   // Create streams
   cudaStream_t defaultStream = 0;
-  auto it = userDefaultStreams_.find(device);
-  if (it != userDefaultStreams_.end()) {
-    // We already have a stream provided by the user
-    defaultStream = it->second;
-  } else {
-    CUDA_VERIFY(cudaStreamCreateWithFlags(&defaultStream,
-                                          cudaStreamNonBlocking));
-  }
+  CUDA_VERIFY(cudaStreamCreateWithFlags(&defaultStream,
+                                        cudaStreamNonBlocking));
 
   defaultStreams_[device] = defaultStream;
 
@@ -308,15 +296,14 @@ StandardGpuResourcesImpl::initializeForDevice(int device) {
   FAISS_ASSERT(blasStatus == CUBLAS_STATUS_SUCCESS);
   blasHandles_[device] = blasHandle;
 
-  // Enable tensor core support if available
-#if CUDA_VERSION >= 9000 && CUDA_VERSION < 11000
-  // This flag was deprecated in CUDA 11
-  if (getTensorCoreSupport(device)) {
-    cublasSetMathMode(blasHandle, CUBLAS_TENSOR_OP_MATH);
-  }
-#endif
+  // For CUDA 10 on V100, enabling tensor core usage would enable automatic
+  // rounding down of inputs to f16 (though accumulate in f32) which results in
+  // unacceptable loss of precision in general.
+  // For CUDA 11 / A100, only enable tensor core support if it doesn't result in
+  // a loss of precision.
 #if CUDA_VERSION >= 11000
-  cublasSetMathMode(blasHandle, CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION);
+  cublasSetMathMode(blasHandle,
+                    CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION);
 #endif
 
   FAISS_ASSERT(allocs_.count(device) == 0);
@@ -341,6 +328,14 @@ StandardGpuResourcesImpl::getBlasHandle(int device) {
 cudaStream_t
 StandardGpuResourcesImpl::getDefaultStream(int device) {
   initializeForDevice(device);
+
+  auto it = userDefaultStreams_.find(device);
+  if (it != userDefaultStreams_.end()) {
+    // There is a user override stream set
+    return it->second;
+  }
+
+  // Otherwise, our base default stream
   return defaultStreams_[device];
 }
 
@@ -537,6 +532,11 @@ StandardGpuResources::setPinnedMemory(size_t size) {
 void
 StandardGpuResources::setDefaultStream(int device, cudaStream_t stream) {
   res_->setDefaultStream(device, stream);
+}
+
+void
+StandardGpuResources::revertDefaultStream(int device) {
+  res_->revertDefaultStream(device);
 }
 
 void

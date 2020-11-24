@@ -99,6 +99,7 @@ typedef uint64_t size_t;
 #include <faiss/utils/extra_distances.h>
 #include <faiss/utils/random.h>
 #include <faiss/utils/Heap.h>
+#include <faiss/utils/partitioning.h>
 #include <faiss/impl/AuxIndexStructures.h>
 
 #ifndef _MSC_VER
@@ -174,7 +175,9 @@ namespace std {
         T * data();
         size_t size();
         T at (size_t n) const;
+        T & operator [] (size_t n);
         void resize (size_t n);
+
         void swap (vector<T> & other);
     };
 };
@@ -182,6 +185,7 @@ namespace std {
 %include <std_string.i>
 %include <std_pair.i>
 %include <std_map.i>
+%include <std_shared_ptr.i>
 
 // primitive array types
 %template(FloatVector) std::vector<float>;
@@ -226,7 +230,9 @@ namespace std {
 
 %ignore *::cmp;
 
+%include  <faiss/utils/ordered_key_value.h>
 %include  <faiss/utils/Heap.h>
+%include  <faiss/utils/partitioning.h>
 %include  <faiss/utils/hamming.h>
 
 int get_num_gpus();
@@ -235,6 +241,9 @@ void gpu_profiler_stop();
 void gpu_sync_all_devices();
 
 #ifdef GPU_WRAPPER
+
+%shared_ptr(faiss::gpu::GpuResources);
+%shared_ptr(faiss::gpu::StandardGpuResourcesImpl);
 
 %{
 
@@ -274,7 +283,6 @@ void gpu_sync_all_devices()
 
 %}
 
-
 %template() std::pair<int, unsigned long>;
 %template() std::map<std::string, std::pair<int, unsigned long> >;
 %template() std::map<int, std::map<std::string, std::pair<int, unsigned long> > >;
@@ -286,6 +294,21 @@ void gpu_sync_all_devices()
 
 %include  <faiss/gpu/GpuResources.h>
 %include  <faiss/gpu/StandardGpuResources.h>
+
+typedef CUstream_st* cudaStream_t;
+
+%inline %{
+
+// interop between pytorch exposed cudaStream_t and faiss
+cudaStream_t cast_integer_to_cudastream_t(long long x) {
+  return (cudaStream_t) x;
+}
+
+long long cast_cudastream_t_to_integer(cudaStream_t x) {
+  return (long) x;
+}
+
+%}
 
 #else
 
@@ -751,7 +774,7 @@ REV_SWIG_PTR(uint64_t, NPY_UINT64);
 
 
 /*******************************************************************
- * How should the template objects apprear in the scripting language?
+ * How should the template objects appear in the scripting language?
  *******************************************************************/
 
 // answer: the same as the C++ typedefs, but we still have to redefine them
@@ -767,6 +790,10 @@ REV_SWIG_PTR(uint64_t, NPY_UINT64);
 %template(float_maxheap_array_t) faiss::HeapArray<faiss::CMax<float, int64_t> >;
 %template(int_maxheap_array_t) faiss::HeapArray<faiss::CMax<int, int64_t> >;
 
+%template(CMin_float_partition_fuzzy)
+    faiss::partition_fuzzy<faiss::CMin<float, int64_t> >;
+%template(CMax_float_partition_fuzzy)
+    faiss::partition_fuzzy<faiss::CMax<float, int64_t> >;
 
 /*******************************************************************
  * Expose a few basic functions
@@ -783,16 +810,24 @@ void *memcpy(void *dest, const void *src, size_t n);
  *******************************************************************/
 
 %inline %{
-float * cast_integer_to_float_ptr (long x) {
+uint8_t * cast_integer_to_uint8_ptr (long long x) {
+    return (uint8_t*)x;
+}
+
+float * cast_integer_to_float_ptr (long long x) {
     return (float*)x;
 }
 
-long * cast_integer_to_long_ptr (long x) {
-    return (long*)x;
+faiss::Index::idx_t* cast_integer_to_idx_t_ptr (long long x) {
+    return (faiss::Index::idx_t*)x;
 }
 
-int * cast_integer_to_int_ptr (long x) {
+int * cast_integer_to_int_ptr (long long x) {
     return (int*)x;
+}
+
+void * cast_integer_to_void_ptr (long long x) {
+    return (void*)x;
 }
 
 %}

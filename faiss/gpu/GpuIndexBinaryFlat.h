@@ -38,6 +38,13 @@ class GpuIndexBinaryFlat : public IndexBinary {
 
   ~GpuIndexBinaryFlat() override;
 
+  /// Returns the device that this index is resident on
+  int getDevice() const;
+
+  /// Returns a reference to our GpuResources object that manages memory, stream
+  /// and handle resources on the GPU
+  std::shared_ptr<GpuResources> getResources();
+
   /// Initialize ourselves from the given CPU index; will overwrite
   /// all data in ourselves
   void copyFrom(const faiss::IndexBinaryFlat* index);
@@ -80,7 +87,7 @@ class GpuIndexBinaryFlat : public IndexBinary {
   std::shared_ptr<GpuResources> resources_;
 
   /// Configuration options
-  GpuIndexBinaryFlatConfig config_;
+  const GpuIndexBinaryFlatConfig binaryFlatConfig_;
 
   /// Holds our GPU data containing the list of vectors
   std::unique_ptr<BinaryFlatIndex> data_;

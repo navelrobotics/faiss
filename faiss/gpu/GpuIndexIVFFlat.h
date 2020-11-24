@@ -56,9 +56,23 @@ class GpuIndexIVFFlat : public GpuIndexIVF {
   /// to exactly the amount needed. Returns space reclaimed in bytes
   size_t reclaimMemory();
 
+  /// Clears out all inverted lists, but retains the coarse centroid information
   void reset() override;
 
+  /// Trains the coarse quantizer based on the given vector data
   void train(Index::idx_t n, const float* x) override;
+
+  /// Returns the number of vectors present in a particular inverted list
+  int getListLength(int listId) const override;
+
+  /// Return the encoded vector data contained in a particular inverted list,
+  /// for debugging purposes. This is represented in a CPU Faiss (IndexIVF*)
+  /// compliant format, while the native GPU format may differ.
+  std::vector<uint8_t> getListVectorData(int listId) const override;
+
+  /// Return the vector indices contained in a particular inverted list, for
+  /// debugging purposes.
+  std::vector<Index::idx_t> getListIndices(int listId) const override;
 
  protected:
   /// Called from GpuIndex for add/add_with_ids
@@ -73,8 +87,9 @@ class GpuIndexIVFFlat : public GpuIndexIVF {
                    float* distances,
                    Index::idx_t* labels) const override;
 
- private:
-  GpuIndexIVFFlatConfig ivfFlatConfig_;
+ protected:
+  /// Our configuration options
+  const GpuIndexIVFFlatConfig ivfFlatConfig_;
 
   /// Desired inverted list memory reservation
   size_t reserveMemoryVecs_;
