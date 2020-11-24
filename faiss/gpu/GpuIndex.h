@@ -36,9 +36,12 @@ class GpuIndex : public faiss::Index {
            float metricArg,
            GpuIndexConfig config);
 
-  inline int getDevice() const {
-    return device_;
-  }
+  /// Returns the device that this index is resident on
+  int getDevice() const;
+
+  /// Returns a reference to our GpuResources object that manages memory, stream
+  /// and handle resources on the GPU
+  std::shared_ptr<GpuResources> getResources();
 
   /// Set the minimum data size for searches (in MiB) for which we use
   /// CPU -> GPU paging
@@ -50,7 +53,7 @@ class GpuIndex : public faiss::Index {
   /// `x` can be resident on the CPU or any GPU; copies are performed
   /// as needed
   /// Handles paged adds if the add set is too large; calls addInternal_
-  void add(faiss::Index::idx_t, const float* x) override;
+  void add(Index::idx_t, const float* x) override;
 
   /// `x` and `ids` can be resident on the CPU or any GPU; copies are
   /// performed as needed
@@ -58,6 +61,13 @@ class GpuIndex : public faiss::Index {
   void add_with_ids(Index::idx_t n,
                     const float* x,
                     const Index::idx_t* ids) override;
+
+  /// `x` and `labels` can be resident on the CPU or any GPU; copies are
+  /// performed as needed
+  void assign(Index::idx_t n,
+              const float* x,
+              Index::idx_t* labels,
+              Index::idx_t k = 1) const override;
 
   /// `x`, `distances` and `labels` can be resident on the CPU or any
   /// GPU; copies are performed as needed
@@ -136,11 +146,8 @@ private:
   /// Manages streams, cuBLAS handles and scratch memory for devices
   std::shared_ptr<GpuResources> resources_;
 
-  /// The GPU device we are resident on
-  const int device_;
-
-  /// The memory space of our primary storage on the GPU
-  const MemorySpace memorySpace_;
+  /// Our configuration options
+  const GpuIndexConfig config_;
 
   /// Size above which we page copies from the CPU to GPU
   size_t minPagedSize_;

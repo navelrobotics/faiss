@@ -66,7 +66,7 @@ void
 GpuIndexIVFScalarQuantizer::reserveMemory(size_t numVecs) {
   reserveMemoryVecs_ = numVecs;
   if (index_) {
-    DeviceScope scope(device_);
+    DeviceScope scope(config_.device);
     index_->reserveMemory(numVecs);
   }
 }
@@ -74,7 +74,7 @@ GpuIndexIVFScalarQuantizer::reserveMemory(size_t numVecs) {
 void
 GpuIndexIVFScalarQuantizer::copyFrom(
   const faiss::IndexIVFScalarQuantizer* index) {
-  DeviceScope scope(device_);
+  DeviceScope scope(config_.device);
 
   // Clear out our old data
   index_.reset();
@@ -101,7 +101,7 @@ GpuIndexIVFScalarQuantizer::copyFrom(
                            by_residual,
                            &sq,
                            ivfSQConfig_.indicesOptions,
-                           memorySpace_));
+                           config_.memorySpace));
 
   // Copy all of the IVF data
   index_->copyInvertedListsFrom(index->invlists);
@@ -110,7 +110,7 @@ GpuIndexIVFScalarQuantizer::copyFrom(
 void
 GpuIndexIVFScalarQuantizer::copyTo(
   faiss::IndexIVFScalarQuantizer* index) const {
-  DeviceScope scope(device_);
+  DeviceScope scope(config_.device);
 
   // We must have the indices in order to copy to ourselves
   FAISS_THROW_IF_NOT_MSG(
@@ -135,7 +135,7 @@ GpuIndexIVFScalarQuantizer::copyTo(
 size_t
 GpuIndexIVFScalarQuantizer::reclaimMemory() {
   if (index_) {
-    DeviceScope scope(device_);
+    DeviceScope scope(config_.device);
 
     return index_->reclaimMemory();
   }
@@ -146,13 +146,37 @@ GpuIndexIVFScalarQuantizer::reclaimMemory() {
 void
 GpuIndexIVFScalarQuantizer::reset() {
   if (index_) {
-    DeviceScope scope(device_);
+    DeviceScope scope(config_.device);
 
     index_->reset();
     this->ntotal = 0;
   } else {
     FAISS_ASSERT(this->ntotal == 0);
   }
+}
+
+int
+GpuIndexIVFScalarQuantizer::getListLength(int listId) const {
+  FAISS_ASSERT(index_);
+  DeviceScope scope(config_.device);
+
+  return index_->getListLength(listId);
+}
+
+std::vector<uint8_t>
+GpuIndexIVFScalarQuantizer::getListVectorData(int listId) const {
+  FAISS_ASSERT(index_);
+  DeviceScope scope(config_.device);
+
+  return index_->getListVectorData(listId);
+}
+
+std::vector<Index::idx_t>
+GpuIndexIVFScalarQuantizer::getListIndices(int listId) const {
+  FAISS_ASSERT(index_);
+  DeviceScope scope(config_.device);
+
+  return index_->getListIndices(listId);
 }
 
 void
@@ -163,7 +187,12 @@ GpuIndexIVFScalarQuantizer::trainResiduals_(Index::idx_t n, const float* x) {
 
 void
 GpuIndexIVFScalarQuantizer::train(Index::idx_t n, const float* x) {
-  DeviceScope scope(device_);
+  // For now, only support <= max int results
+  FAISS_THROW_IF_NOT_FMT(n <= (Index::idx_t) std::numeric_limits<int>::max(),
+                         "GPU index only supports up to %d indices",
+                         std::numeric_limits<int>::max());
+
+  DeviceScope scope(config_.device);
 
   if (this->is_trained) {
     FAISS_ASSERT(quantizer->is_trained);
@@ -178,7 +207,7 @@ GpuIndexIVFScalarQuantizer::train(Index::idx_t n, const float* x) {
   // First, make sure that the data is resident on the CPU, if it is not on the
   // CPU, as we depend upon parts of the CPU code
   auto hostData = toHost<float, 2>((float*) x,
-                                   resources_->getDefaultStream(device_),
+                                   resources_->getDefaultStream(config_.device),
                                    {(int) n, (int) this->d});
 
   trainQuantizer_(n, hostData.data());
@@ -192,7 +221,7 @@ GpuIndexIVFScalarQuantizer::train(Index::idx_t n, const float* x) {
                            by_residual,
                            &sq,
                            ivfSQConfig_.indicesOptions,
-                           memorySpace_));
+                           config_.memorySpace));
 
   if (reserveMemoryVecs_) {
     index_->reserveMemory(reserveMemoryVecs_);
@@ -211,9 +240,7 @@ GpuIndexIVFScalarQuantizer::addImpl_(int n,
 
   // Data is already resident on the GPU
   Tensor<float, 2, true> data(const_cast<float*>(x), {n, (int) this->d});
-
-  static_assert(sizeof(long) == sizeof(Index::idx_t), "size mismatch");
-  Tensor<long, 1, true> labels(const_cast<long*>(xids), {n});
+  Tensor<Index::idx_t, 1, true> labels(const_cast<Index::idx_t*>(xids), {n});
 
   // Not all vectors may be able to be added (some may contain NaNs etc)
   index_->addVectors(data, labels);
@@ -236,9 +263,7 @@ GpuIndexIVFScalarQuantizer::searchImpl_(int n,
   // Data is already resident on the GPU
   Tensor<float, 2, true> queries(const_cast<float*>(x), {n, (int) this->d});
   Tensor<float, 2, true> outDistances(distances, {n, k});
-
-  static_assert(sizeof(long) == sizeof(Index::idx_t), "size mismatch");
-  Tensor<long, 2, true> outLabels(const_cast<long*>(labels), {n, k});
+  Tensor<Index::idx_t, 2, true> outLabels(const_cast<Index::idx_t*>(labels), {n, k});
 
   index_->query(queries, nprobe, k, outDistances, outLabels);
 }

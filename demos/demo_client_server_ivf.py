@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
 
 import sys
 import numpy as np
 import faiss
 
-from faiss_contrib.client_server import run_index_server, ClientIndex
+from faiss.contrib.client_server import run_index_server, ClientIndex
 
 
 #################################################################

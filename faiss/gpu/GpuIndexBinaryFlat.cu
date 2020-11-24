@@ -23,7 +23,7 @@ GpuIndexBinaryFlat::GpuIndexBinaryFlat(GpuResourcesProvider* provider,
                                        GpuIndexBinaryFlatConfig config)
     : IndexBinary(index->d),
       resources_(provider->getResources()),
-      config_(std::move(config)) {
+      binaryFlatConfig_(config) {
   FAISS_THROW_IF_NOT_FMT(this->d % 8 == 0,
                          "vector dimension (number of bits) "
                          "must be divisible by 8 (passed %d)",
@@ -41,7 +41,7 @@ GpuIndexBinaryFlat::GpuIndexBinaryFlat(GpuResourcesProvider* provider,
                                        GpuIndexBinaryFlatConfig config)
     : IndexBinary(dims),
       resources_(provider->getResources()),
-      config_(std::move(config)) {
+      binaryFlatConfig_(std::move(config)) {
   FAISS_THROW_IF_NOT_FMT(this->d % 8 == 0,
                          "vector dimension (number of bits) "
                          "must be divisible by 8 (passed %d)",
@@ -51,23 +51,33 @@ GpuIndexBinaryFlat::GpuIndexBinaryFlat(GpuResourcesProvider* provider,
   this->is_trained = true;
 
   // Construct index
-  DeviceScope scope(config_.device);
-  data_.reset(
-    new BinaryFlatIndex(resources_.get(), this->d, config_.memorySpace));
+  DeviceScope scope(binaryFlatConfig_.device);
+  data_.reset(new BinaryFlatIndex(resources_.get(),
+                                  this->d, binaryFlatConfig_.memorySpace));
 }
 
 GpuIndexBinaryFlat::~GpuIndexBinaryFlat() {
 }
 
+int
+GpuIndexBinaryFlat::getDevice() const {
+  return binaryFlatConfig_.device;
+}
+
+std::shared_ptr<GpuResources>
+GpuIndexBinaryFlat::getResources() {
+  return resources_;
+}
+
 void
 GpuIndexBinaryFlat::copyFrom(const faiss::IndexBinaryFlat* index) {
-  DeviceScope scope(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
 
   this->d = index->d;
 
   // GPU code has 32 bit indices
   FAISS_THROW_IF_NOT_FMT(index->ntotal <=
-                         (faiss::Index::idx_t) std::numeric_limits<int>::max(),
+                         (Index::idx_t) std::numeric_limits<int>::max(),
                          "GPU index only supports up to %zu indices; "
                          "attempting to copy CPU index with %zu parameters",
                          (size_t) std::numeric_limits<int>::max(),
@@ -76,20 +86,20 @@ GpuIndexBinaryFlat::copyFrom(const faiss::IndexBinaryFlat* index) {
 
   // destroy old first before allocating new
   data_.reset();
-  data_.reset(
-    new BinaryFlatIndex(resources_.get(), this->d, config_.memorySpace));
+  data_.reset(new BinaryFlatIndex(resources_.get(),
+                                  this->d, binaryFlatConfig_.memorySpace));
 
   // The index could be empty
   if (index->ntotal > 0) {
     data_->add(index->xb.data(),
                index->ntotal,
-               resources_->getDefaultStream(config_.device));
+               resources_->getDefaultStream(binaryFlatConfig_.device));
   }
 }
 
 void
 GpuIndexBinaryFlat::copyTo(faiss::IndexBinaryFlat* index) const {
-  DeviceScope scope(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
 
   index->d = this->d;
   index->ntotal = this->ntotal;
@@ -101,35 +111,35 @@ GpuIndexBinaryFlat::copyTo(faiss::IndexBinaryFlat* index) const {
   if (this->ntotal > 0) {
     fromDevice(data_->getVectorsRef(),
                index->xb.data(),
-               resources_->getDefaultStream(config_.device));
+               resources_->getDefaultStream(binaryFlatConfig_.device));
   }
 }
 
 void
 GpuIndexBinaryFlat::add(faiss::IndexBinary::idx_t n,
                         const uint8_t* x) {
-  DeviceScope scope(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
 
   // To avoid multiple re-allocations, ensure we have enough storage
   // available
-  data_->reserve(n, resources_->getDefaultStream(config_.device));
+  data_->reserve(n, resources_->getDefaultStream(binaryFlatConfig_.device));
 
   // Due to GPU indexing in int32, we can't store more than this
   // number of vectors on a GPU
   FAISS_THROW_IF_NOT_FMT(this->ntotal + n <=
-                         (faiss::Index::idx_t) std::numeric_limits<int>::max(),
+                         (Index::idx_t) std::numeric_limits<int>::max(),
                          "GPU index only supports up to %zu indices",
                          (size_t) std::numeric_limits<int>::max());
 
   data_->add((const unsigned char*) x,
              n,
-             resources_->getDefaultStream(config_.device));
+             resources_->getDefaultStream(binaryFlatConfig_.device));
   this->ntotal += n;
 }
 
 void
 GpuIndexBinaryFlat::reset() {
-  DeviceScope scope(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
 
   // Free the underlying memory
   data_->reset();
@@ -155,8 +165,8 @@ GpuIndexBinaryFlat::search(faiss::IndexBinary::idx_t n,
                          getMaxKSelection(),
                          (int) k); // select limitation
 
-  DeviceScope scope(config_.device);
-  auto stream = resources_->getDefaultStream(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
+  auto stream = resources_->getDefaultStream(binaryFlatConfig_.device);
 
   // The input vectors may be too large for the GPU, but we still
   // assume that the output distances and labels are not.
@@ -165,7 +175,7 @@ GpuIndexBinaryFlat::search(faiss::IndexBinary::idx_t n,
   // If we reach a point where all inputs are too big, we can add
   // another level of tiling.
   auto outDistances = toDeviceTemporary<int32_t, 2>(resources_.get(),
-                                                    config_.device,
+                                                    binaryFlatConfig_.device,
                                                     distances,
                                                     stream,
                                                     {(int) n, (int) k});
@@ -202,20 +212,18 @@ GpuIndexBinaryFlat::search(faiss::IndexBinary::idx_t n,
 
   // Convert and copy int indices out
   auto outIndices =
-    toDeviceTemporary<faiss::Index::idx_t, 2>(resources_.get(),
-                                              config_.device,
-                                              labels,
-                                              stream,
-                                              {(int) n, (int) k});
+    toDeviceTemporary<Index::idx_t, 2>(resources_.get(),
+                                       binaryFlatConfig_.device,
+                                       labels,
+                                       stream,
+                                       {(int) n, (int) k});
 
-  // Convert int to long
-  convertTensor<int, faiss::Index::idx_t, 2>(stream,
-                                             outIntIndices,
-                                             outIndices);
+  // Convert int to idx_t
+  convertTensor<int, Index::idx_t, 2>(stream, outIntIndices, outIndices);
 
   // Copy back if necessary
   fromDevice<int32_t, 2>(outDistances, distances, stream);
-  fromDevice<faiss::Index::idx_t, 2>(outIndices, labels, stream);
+  fromDevice<Index::idx_t, 2>(outIndices, labels, stream);
 }
 
 void
@@ -227,12 +235,12 @@ GpuIndexBinaryFlat::searchNonPaged_(int n,
   Tensor<int32_t, 2, true> outDistances(outDistancesData, {n, k});
   Tensor<int, 2, true> outIndices(outIndicesData, {n, k});
 
-  auto stream = resources_->getDefaultStream(config_.device);
+  auto stream = resources_->getDefaultStream(binaryFlatConfig_.device);
 
   // Make sure arguments are on the device we desire; use temporary
   // memory allocations to move it if necessary
   auto vecs = toDeviceTemporary<uint8_t, 2>(resources_.get(),
-                                            config_.device,
+                                            binaryFlatConfig_.device,
                                             const_cast<uint8_t*>(x),
                                             stream,
                                             {n, (int) (this->d / 8)});
@@ -272,10 +280,10 @@ GpuIndexBinaryFlat::searchFromCpuPaged_(int n,
 void
 GpuIndexBinaryFlat::reconstruct(faiss::IndexBinary::idx_t key,
                                 uint8_t* out) const {
-  DeviceScope scope(config_.device);
+  DeviceScope scope(binaryFlatConfig_.device);
 
   FAISS_THROW_IF_NOT_MSG(key < this->ntotal, "index out of bounds");
-  auto stream = resources_->getDefaultStream(config_.device);
+  auto stream = resources_->getDefaultStream(binaryFlatConfig_.device);
 
   auto& vecs = data_->getVectorsRef();
   auto vec = vecs[key];
