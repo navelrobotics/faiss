@@ -1,0 +1,27 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Source: https://github.com/facebookresearch/faiss
+
+Files: *
+Copyright: Facebook, Inc. and its affiliates.
+License: Expat
+
+Files: debian/*
+Copyright: 2020 Mo Zhou <lumin@debian.org>
+License: Expat
+
+Files: ./faiss/gpu/utils/nvidia/fp16_emu.cu
+       ./faiss/gpu/utils/nvidia/fp16_emu.cuh
+Copyright: 1993-2014, NVIDIA Corporation.
+License: UNKNOWN
+ FIXME
+
+Files: ./docs/html/jquery.js
+Copyright: 2011, John Resig
+License: Expat
+ FIXME
+
+Files: ./docs/html/search/search.js
+Copyright: 2003-2008, Greg Valure
+  2009, Dimitri van Heesch.
+License: GPL
+ FIXME

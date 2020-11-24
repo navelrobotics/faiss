@@ -1,0 +1,2 @@
+Tests: test.py
+Restrictions: allow-stderr

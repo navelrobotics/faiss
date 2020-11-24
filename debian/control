@@ -10,6 +10,7 @@ Uploaders: Mo Zhou <lumin@debian.org>
 Rules-Requires-Root: no
 Build-Depends: debhelper-compat (= 13), cmake, libblas-dev, liblapack-dev,
  dh-python, python3-all-dev, swig, python3-all, python3-numpy, python3-setuptools,
+ libblis3-serial,
 
 Package: libfaiss-dev
 Architecture: any
@@ -26,7 +27,7 @@ Description: efficient similarity search and clustering of dense vectors
 
 Package: python3-faiss
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, ${python3:Depends},
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
