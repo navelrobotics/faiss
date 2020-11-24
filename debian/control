@@ -8,14 +8,22 @@ Vcs-Browser: https://salsa.debian.org/deeplearning-team/faiss
 Maintainer: Debian Deep Learning Team <debian-ai@lists.debian.org>
 Uploaders: Mo Zhou <lumin@debian.org>
 Rules-Requires-Root: no
-Build-Depends: debhelper-compat (= 13), cmake, libblas-dev, liblapack-dev,
- dh-python, python3-all-dev, swig, python3-all, python3-numpy, python3-setuptools,
- libblis3-serial,
+Build-Depends: cmake,
+               debhelper-compat (= 13),
+               dh-python,
+               libblas-dev,
+               libblis3-serial,
+               liblapack-dev,
+               python3-all,
+               python3-all-dev,
+               python3-numpy,
+               python3-setuptools,
+               swig
 
 Package: libfaiss-dev
 Architecture: any
 Depends: ${misc:Depends}
-Recommends: libopenblas-dev | libblis-dev | intel-mkl | libblas-dev,
+Recommends: libopenblas-dev | libblis-dev | intel-mkl | libblas-dev
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
@@ -28,8 +36,8 @@ Description: efficient similarity search and clustering of dense vectors
 
 Package: python3-faiss
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, ${python3:Depends},
-Recommends: libopenblas0 | libblis3 | libmkl-rt | libblas.so.3,
+Depends: ${misc:Depends}, ${python3:Depends}, ${shlibs:Depends}
+Recommends: libopenblas0 | libblis3 | libmkl-rt | libblas.so.3
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
