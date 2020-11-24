@@ -1,0 +1,38 @@
+Source: faiss
+Section: science
+Homepage: https://github.com/facebookresearch/faiss
+Priority: optional
+Standards-Version: 4.5.0
+Vcs-Git: https://salsa.debian.org/deeplearning-team/faiss.git
+Vcs-Browser: https://salsa.debian.org/deeplearning-team/faiss
+Maintainer: Debian Deep Learning Team <debian-ai@lists.debian.org>
+Uploaders: Mo Zhou <lumin@debian.org>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13), cmake, libblas-dev, liblapack-dev,
+ dh-python, python3-all-dev, swig, python3-all, python3-numpy, python3-setuptools,
+
+Package: libfaiss-dev
+Architecture: any
+Depends: ${misc:Depends}
+Description: efficient similarity search and clustering of dense vectors
+ Faiss is a library for efficient similarity search and clustering of dense
+ vectors. It contains algorithms that search in sets of vectors of any size, up
+ to ones that possibly do not fit in RAM. It also contains supporting code for
+ evaluation and parameter tuning. Faiss is written in C++ with complete wrappers
+ for Python/numpy. Some of the most useful algorithms are implemented on the
+ GPU. It is developed by Facebook AI Research.
+ .
+ This package contains the development files.
+
+Package: python3-faiss
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: efficient similarity search and clustering of dense vectors
+ Faiss is a library for efficient similarity search and clustering of dense
+ vectors. It contains algorithms that search in sets of vectors of any size, up
+ to ones that possibly do not fit in RAM. It also contains supporting code for
+ evaluation and parameter tuning. Faiss is written in C++ with complete wrappers
+ for Python/numpy. Some of the most useful algorithms are implemented on the
+ GPU. It is developed by Facebook AI Research.
+ .
+ This package contains the python interface.
