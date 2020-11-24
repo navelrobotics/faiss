@@ -1,5 +1,5 @@
-faiss (1.6.4-1~exp1) UNRELEASED; urgency=medium
+faiss (1.6.5-1~exp1) UNRELEASED; urgency=medium
 
-  * New upstream version 1.6.4 (Closes: #975369)
+  * New upstream version 1.6.5 (Closes: #975369)
 
- -- Mo Zhou <lumin@debian.org>  Tue, 24 Nov 2020 09:13:16 +0800
+ -- Mo Zhou <lumin@debian.org>  Tue, 24 Nov 2020 13:31:26 +0800
