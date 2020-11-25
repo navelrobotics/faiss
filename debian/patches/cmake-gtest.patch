@@ -1,16 +1,38 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -21,6 +21,7 @@
+ option(FAISS_OPT_LEVEL "" "generic")
+ option(FAISS_ENABLE_GPU "Enable support for GPU indexes." ON)
+ option(FAISS_ENABLE_PYTHON "Build Python extension." ON)
++option(FAISS_USE_SYSTEM_GTEST "Use system-provided gtest library." OFF)
+ 
+ if(FAISS_ENABLE_GPU)
+   set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -21,21 +21,17 @@
+@@ -21,21 +21,27 @@
    test_transfer_invlists.cpp
  )
  
 -include(FetchContent)
 -FetchContent_Declare(googletest
 -  URL "https://github.com/google/googletest/archive/release-1.10.0.tar.gz")
- set(BUILD_GMOCK CACHE BOOL OFF)
- set(INSTALL_GTEST CACHE BOOL OFF)
+-set(BUILD_GMOCK CACHE BOOL OFF)
+-set(INSTALL_GTEST CACHE BOOL OFF)
 -FetchContent_MakeAvailable(googletest)
-+find_package(GTest REQUIRED)
++if(NOT FAISS_USE_SYSTEM_GTEST)
++  include(FetchContent)
++  FetchContent_Declare(googletest
++    URL "https://github.com/google/googletest/archive/release-1.10.0.tar.gz")
++  set(BUILD_GMOCK CACHE BOOL OFF)
++  set(INSTALL_GTEST CACHE BOOL OFF)
++  FetchContent_MakeAvailable(googletest)
++  # Defines `gtest_discover_tests()`.
++  include(GoogleTest)
++else()
++  find_package(GTest REQUIRED)
++  include_directories(${GTEST_INCLUDE_DIRS})
++endif()
  
  find_package(OpenMP REQUIRED)
  
@@ -19,8 +41,9 @@
    OpenMP::OpenMP_CXX
 -  gtest_main
 +  ${GTEST_BOTH_LIBRARIES}
++  pthread
  )
  
- # Defines `gtest_discover_tests()`.
+-# Defines `gtest_discover_tests()`.
 -include(GoogleTest)
  gtest_discover_tests(faiss_test)
