@@ -1,1 +1,2 @@
 cmake-gnuinstalldir.patch
+cmake-gtest.patch
