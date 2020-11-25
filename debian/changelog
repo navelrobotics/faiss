@@ -1,3 +1,14 @@
+faiss (1.6.5-1) unstable; urgency=medium
+
+  * Add the missing B-D libgtest-dev.
+  * CMake: patch to use system GTest instead of downloaded one.
+  * Rewrite the gtest patch and introduce FAISS_USE_SYSTEM_GTEST flag.
+  * Enable hardening, and disable BUILD_TESTING on all non-amd64 arches.
+  * Apply wrap-and-sort.
+  * Upload to unstable.
+
+ -- Mo Zhou <lumin@debian.org>  Wed, 25 Nov 2020 14:56:29 +0800
+
 faiss (1.6.5-1~exp1) experimental; urgency=medium
 
   * New upstream version 1.6.5 (Closes: #975369)

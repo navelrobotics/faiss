@@ -13,12 +13,12 @@ Build-Depends: cmake,
                dh-python,
                libblas-dev,
                libblis3-serial,
+               libgtest-dev,
                liblapack-dev,
                python3-all,
                python3-all-dev,
                python3-numpy,
                python3-setuptools,
-               libgtest-dev,
                swig
 
 Package: libfaiss-dev
