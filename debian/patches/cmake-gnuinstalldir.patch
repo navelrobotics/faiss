@@ -1,8 +1,6 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 29b73d8..158712e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -11,6 +11,7 @@ project(faiss
+@@ -11,6 +11,7 @@
    DESCRIPTION "A library for efficient similarity search and clustering of dense vectors."
    HOMEPAGE_URL "https://github.com/facebookresearch/faiss"
    LANGUAGES CXX)
@@ -10,11 +8,9 @@ index 29b73d8..158712e 100644
  
  set(CMAKE_CXX_STANDARD 11)
  
-diff --git a/faiss/CMakeLists.txt b/faiss/CMakeLists.txt
-index 51680fd..3469538 100644
 --- a/faiss/CMakeLists.txt
 +++ b/faiss/CMakeLists.txt
-@@ -160,15 +160,15 @@ endif()
+@@ -164,15 +164,15 @@
  
  install(TARGETS faiss
    EXPORT faiss-targets
@@ -35,7 +31,7 @@ index 51680fd..3469538 100644
    )
  endforeach()
  
-@@ -185,9 +185,9 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/faiss-config.cmake.in
+@@ -189,9 +189,9 @@
  )
  install(FILES ${PROJECT_BINARY_DIR}/cmake/faiss-config.cmake
    ${PROJECT_BINARY_DIR}/cmake/faiss-config-version.cmake

@@ -18,6 +18,7 @@ Build-Depends: cmake,
                python3-all-dev,
                python3-numpy,
                python3-setuptools,
+               libgtest-dev,
                swig
 
 Package: libfaiss-dev
