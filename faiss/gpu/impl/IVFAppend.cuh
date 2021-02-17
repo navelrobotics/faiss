@@ -15,6 +15,14 @@
 
 namespace faiss { namespace gpu {
 
+/// Append user indices to IVF lists
+void runIVFIndicesAppend(Tensor<int, 1, true>& listIds,
+                         Tensor<int, 1, true>& listOffset,
+                         Tensor<Index::idx_t, 1, true>& indices,
+                         IndicesOptions opt,
+                         thrust::device_vector<void*>& listIndices,
+                         cudaStream_t stream);
+
 /// Update device-side list pointers in a batch
 void runUpdateListPointers(Tensor<int, 1, true>& listIds,
                            Tensor<int, 1, true>& newListLength,
@@ -25,30 +33,44 @@ void runUpdateListPointers(Tensor<int, 1, true>& listIds,
                            thrust::device_vector<void*>& listIndices,
                            cudaStream_t stream);
 
-/// Actually append the new codes / vector indices to the individual lists
+/// Append PQ codes to IVF lists (non-interleaved format)
+void runIVFPQAppend(Tensor<int, 1, true>& listIds,
+                    Tensor<int, 1, true>& listOffset,
+                    Tensor<uint8_t, 2, true>& encodings,
+                    thrust::device_vector<void*>& listCodes,
+                    cudaStream_t stream);
 
-/// IVFPQ
-void runIVFPQInvertedListAppend(Tensor<int, 1, true>& listIds,
-                                Tensor<int, 1, true>& listOffset,
-                                Tensor<int, 2, true>& encodings,
-                                Tensor<Index::idx_t, 1, true>& indices,
-                                bool layoutBy32,
-                                thrust::device_vector<void*>& listCodes,
-                                thrust::device_vector<void*>& listIndices,
-                                IndicesOptions indicesOptions,
-                                cudaStream_t stream);
+/// Append PQ codes to IVF lists (interleaved format)
+void runIVFPQInterleavedAppend(Tensor<int, 1, true>& listIds,
+                               Tensor<int, 1, true>& listOffset,
+                               Tensor<int, 1, true>& uniqueLists,
+                               Tensor<int, 1, true>& vectorsByUniqueList,
+                               Tensor<int, 1, true>& uniqueListVectorStart,
+                               Tensor<int, 1, true>& uniqueListStartOffset,
+                               int bitsPerCode,
+                               Tensor<uint8_t, 2, true>& encodings,
+                               thrust::device_vector<void*>& listCodes,
+                               cudaStream_t stream);
 
-/// IVF flat storage
-void runIVFFlatInvertedListAppend(Tensor<int, 1, true>& listIds,
-                                  Tensor<int, 1, true>& listOffset,
-                                  Tensor<float, 2, true>& vecs,
-                                  Tensor<Index::idx_t, 1, true>& indices,
-                                  bool useResidual,
-                                  Tensor<float, 2, true>& residuals,
-                                  GpuScalarQuantizer* scalarQ,
-                                  thrust::device_vector<void*>& listData,
-                                  thrust::device_vector<void*>& listIndices,
-                                  IndicesOptions indicesOptions,
-                                  cudaStream_t stream);
+/// Append SQ codes to IVF lists (non-interleaved, old format)
+void runIVFFlatAppend(Tensor<int, 1, true>& listIds,
+                      Tensor<int, 1, true>& listOffset,
+                      Tensor<float, 2, true>& vecs,
+                      GpuScalarQuantizer* scalarQ,
+                      thrust::device_vector<void*>& listData,
+                      cudaStream_t stream);
+
+/// Append SQ codes to IVF lists (interleaved)
+void runIVFFlatInterleavedAppend(Tensor<int, 1, true>& listIds,
+                                 Tensor<int, 1, true>& listOffset,
+                                 Tensor<int, 1, true>& uniqueLists,
+                                 Tensor<int, 1, true>& vectorsByUniqueList,
+                                 Tensor<int, 1, true>& uniqueListVectorStart,
+                                 Tensor<int, 1, true>& uniqueListStartOffset,
+                                 Tensor<float, 2, true>& vecs,
+                                 GpuScalarQuantizer* scalarQ,
+                                 thrust::device_vector<void*>& listData,
+                                 GpuResources* res,
+                                 cudaStream_t stream);
 
 } } // namespace

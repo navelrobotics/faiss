@@ -12,6 +12,13 @@
 
 namespace faiss { namespace gpu {
 
+// defines to simplify the SASS assembly structure file/line in the profiler
+#define GET_BITFIELD_U32(OUT, VAL, POS, LEN)                            \
+  asm("bfe.u32 %0, %1, %2, %3;" : "=r"(OUT) : "r"(VAL), "r"(POS), "r"(LEN));
+
+#define GET_BITFIELD_U64(OUT, VAL, POS, LEN)                            \
+  asm("bfe.u64 %0, %1, %2, %3;" : "=l"(OUT) : "l"(VAL), "r"(POS), "r"(LEN));
+
 __device__ __forceinline__
 unsigned int getBitfield(unsigned int val, int pos, int len) {
   unsigned int ret;
@@ -20,8 +27,8 @@ unsigned int getBitfield(unsigned int val, int pos, int len) {
 }
 
 __device__ __forceinline__
-unsigned long getBitfield(unsigned long val, int pos, int len) {
-  unsigned long ret;
+uint64_t getBitfield(uint64_t val, int pos, int len) {
+  uint64_t ret;
   asm("bfe.u64 %0, %1, %2, %3;" : "=l"(ret) : "l"(val), "r"(pos), "r"(len));
   return ret;
 }

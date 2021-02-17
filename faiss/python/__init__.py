@@ -485,6 +485,7 @@ add_ref_in_constructor(IndexPreTransform, {2: [0, 1], 1: [0]})
 add_ref_in_method(IndexPreTransform, 'prepend_transform', 0)
 add_ref_in_constructor(IndexIVFPQ, 0)
 add_ref_in_constructor(IndexIVFPQR, 0)
+add_ref_in_constructor(IndexIVFPQFastScan, 0)
 add_ref_in_constructor(Index2Layer, 0)
 add_ref_in_constructor(Level1Quantizer, 0)
 add_ref_in_constructor(IndexIVFScalarQuantizer, 0)
@@ -493,7 +494,9 @@ add_ref_in_constructor(IndexIDMap2, 0)
 add_ref_in_constructor(IndexHNSW, 0)
 add_ref_in_method(IndexShards, 'add_shard', 0)
 add_ref_in_method(IndexBinaryShards, 'add_shard', 0)
-add_ref_in_constructor(IndexRefineFlat, 0)
+add_ref_in_constructor(IndexRefineFlat, {2:[0], 1:[0]})
+add_ref_in_constructor(IndexRefine, {2:[0, 1]})
+
 add_ref_in_constructor(IndexBinaryIVF, 0)
 add_ref_in_constructor(IndexBinaryFromFloat, 0)
 add_ref_in_constructor(IndexBinaryIDMap, 0)
@@ -679,6 +682,35 @@ def copy_array_to_vector(a, v):
     if n > 0:
         memcpy(v.data(), swig_ptr(a), a.nbytes)
 
+# same for AlignedTable
+
+def copy_array_to_AlignedTable(a, v):
+    n, = a.shape
+    # TODO check class name
+    assert v.itemsize() == a.itemsize
+    v.resize(n)
+    if n > 0:
+        memcpy(v.get(), swig_ptr(a), a.nbytes)
+
+def array_to_AlignedTable(a):
+    if a.dtype == 'uint16':
+        v = AlignedTableUint16(a.size)
+    elif a.dtype == 'uint8':
+        v = AlignedTableUint8(a.size)
+    else:
+        assert False
+    copy_array_to_AlignedTable(a, v)
+    return v
+
+def AlignedTable_to_array(v):
+    """ convert an AlignedTable to a numpy array """
+    classname = v.__class__.__name__
+    assert classname.startswith('AlignedTable')
+    dtype = classname[12:].lower()
+    a = np.empty(v.size(), dtype=dtype)
+    if a.size > 0:
+        memcpy(swig_ptr(a), v.data(), a.nbytes)
+    return a
 
 ###########################################
 # Wrapper for a few functions
@@ -778,7 +810,9 @@ def eval_intersection(I1, I2):
 def normalize_L2(x):
     fvec_renorm_L2(x.shape[1], x.shape[0], swig_ptr(x))
 
+######################################################
 # MapLong2Long interface
+######################################################
 
 def replacement_map_add(self, keys, vals):
     n, = keys.shape
@@ -793,6 +827,10 @@ def replacement_map_search_multiple(self, keys):
 
 replace_method(MapLong2Long, 'add', replacement_map_add)
 replace_method(MapLong2Long, 'search_multiple', replacement_map_search_multiple)
+
+######################################################
+# search_with_parameters interface
+######################################################
 
 search_with_parameters_c = search_with_parameters
 
@@ -859,6 +897,42 @@ def range_search_with_parameters(index, x, radius, params=None, output_stats=Fal
             'invlist_scan_ms': ms_per_stage[2],
         }
         return lims, Dout, Iout, stats
+
+
+######################################################
+# KNN function
+######################################################
+
+def knn(xq, xb, k, distance_type=METRIC_L2):
+    """ wrapper around the faiss knn functions without index """
+    nq, d = xq.shape
+    nb, d2 = xb.shape
+    assert d == d2
+
+    I = np.empty((nq, k), dtype='int64')
+    D = np.empty((nq, k), dtype='float32')
+
+    if distance_type == METRIC_L2:
+        heaps = float_maxheap_array_t()
+        heaps.k = k
+        heaps.nh = nq
+        heaps.val = swig_ptr(D)
+        heaps.ids = swig_ptr(I)
+        knn_L2sqr(
+            swig_ptr(xq), swig_ptr(xb),
+            d, nq, nb, heaps
+        )
+    elif distance_type == METRIC_INNER_PRODUCT:
+        heaps = float_minheap_array_t()
+        heaps.k = k
+        heaps.nh = nq
+        heaps.val = swig_ptr(D)
+        heaps.ids = swig_ptr(I)
+        knn_inner_product(
+            swig_ptr(xq), swig_ptr(xb),
+            d, nq, nb, heaps
+        )
+    return D, I
 
 
 ###########################################

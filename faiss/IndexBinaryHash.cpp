@@ -18,16 +18,7 @@
 
 #include <faiss/impl/AuxIndexStructures.h>
 #include <faiss/impl/FaissAssert.h>
-
-#ifdef _MSC_VER
-#include <intrin.h>
-
-static inline int __builtin_ctzll(uint64_t x) {
-    unsigned long ret;
-    _BitScanForward64(&ret, x);
-    return (int)ret;
-}
-#endif // _MSC_VER
+#include <faiss/impl/platform_macros.h>
 
 namespace faiss {
 
@@ -145,8 +136,7 @@ struct KnnSearchResults {
 
     inline void add (float dis, idx_t id) {
         if (dis < heap_sim[0]) {
-            heap_pop<C> (k, heap_sim, heap_ids);
-            heap_push<C> (k, heap_sim, heap_ids, dis, id);
+            heap_replace_top<C> (k, heap_sim, heap_ids, dis, id);
         }
     }
 

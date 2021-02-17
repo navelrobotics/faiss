@@ -63,8 +63,7 @@ void pq_estimators_from_tables_Mmul4 (int M, const CT * codes,
         }
 
         if (C::cmp (heap_dis[0], dis)) {
-            heap_pop<C> (k, heap_dis, heap_ids);
-            heap_push<C> (k, heap_dis, heap_ids, dis, j);
+            heap_replace_top<C> (k, heap_dis, heap_ids, dis, j);
         }
     }
 }
@@ -89,8 +88,7 @@ void pq_estimators_from_tables_M4 (const CT * codes,
         dis += dt[*codes++];
 
         if (C::cmp (heap_dis[0], dis)) {
-            heap_pop<C> (k, heap_dis, heap_ids);
-            heap_push<C> (k, heap_dis, heap_ids, dis, j);
+            heap_replace_top<C> (k, heap_dis, heap_ids, dis, j);
         }
     }
 }
@@ -132,8 +130,7 @@ static inline void pq_estimators_from_tables (const ProductQuantizer& pq,
             dt += ksub;
         }
         if (C::cmp (heap_dis[0], dis)) {
-            heap_pop<C> (k, heap_dis, heap_ids);
-            heap_push<C> (k, heap_dis, heap_ids, dis, j);
+            heap_replace_top<C> (k, heap_dis, heap_ids, dis, j);
         }
     }
 }
@@ -163,8 +160,7 @@ static inline void pq_estimators_from_tables_generic(const ProductQuantizer& pq,
     }
 
     if (C::cmp(heap_dis[0], dis)) {
-      heap_pop<C>(k, heap_dis, heap_ids);
-      heap_push<C>(k, heap_dis, heap_ids, dis, j);
+      heap_replace_top<C>(k, heap_dis, heap_ids, dis, j);
     }
   }
 }
@@ -186,7 +182,7 @@ ProductQuantizer::ProductQuantizer ()
 
 void ProductQuantizer::set_derived_values () {
     // quite a few derived values
-    FAISS_THROW_IF_NOT (d % M == 0);
+    FAISS_THROW_IF_NOT_MSG (d % M == 0, "The dimension of the vector (d) should be a multiple of the number of subquantizers (M)");
     dsub = d / M;
     code_size = (nbits * M + 7) / 8;
     ksub = 1 << nbits;
@@ -762,8 +758,7 @@ void ProductQuantizer::search_sdc (const uint8_t * qcodes,
                 tab += ksub * ksub;
             }
             if (dis < heap_dis[0]) {
-                maxheap_pop (k, heap_dis, heap_ids);
-                maxheap_push (k, heap_dis, heap_ids, dis, j);
+                maxheap_replace_top (k, heap_dis, heap_ids, dis, j);
             }
             bcode += code_size;
         }
