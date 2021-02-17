@@ -15,9 +15,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifndef _MSC_VER
-#include <sys/mman.h>
-#endif // !_MSC_VER
+#include <faiss/invlists/InvertedListsIOHook.h>
 
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/impl/io.h>
@@ -39,17 +37,15 @@
 #include <faiss/IndexScalarQuantizer.h>
 #include <faiss/IndexHNSW.h>
 #include <faiss/IndexLattice.h>
+#include <faiss/IndexPQFastScan.h>
+#include <faiss/IndexIVFPQFastScan.h>
+#include <faiss/IndexRefine.h>
 
 #include <faiss/IndexBinaryFlat.h>
 #include <faiss/IndexBinaryFromFloat.h>
 #include <faiss/IndexBinaryHNSW.h>
 #include <faiss/IndexBinaryIVF.h>
 #include <faiss/IndexBinaryHash.h>
-
-#ifndef _MSC_VER
-#include <faiss/OnDiskInvertedLists.h>
-#endif // !_MSC_VER
-
 
 /*************************************************************
  * The I/O format is the content of the class. For objects that are
@@ -65,9 +61,6 @@
  * The fourccs are assigned arbitrarily. When the class changed (added
  * or deprecated fields), the fourcc can be replaced. New code should
  * be able to read the old fourcc and fill in new classes.
- *
- * TODO: serialization to strings for use in Python pickle or Torch
- * serialization.
  *
  * TODO: in this file, the read functions that encouter errors may
  * leak memory.
@@ -216,19 +209,10 @@ void write_InvertedLists (const InvertedLists *ils, IOWriter *f) {
                 WRITEANDCHECK (ails->ids[i].data(), n);
             }
         }
-#ifndef _MSC_VER
-    } else {
 
+    } else {
         InvertedListsIOHook::lookup_classname(
                 typeid(*ils).name())->write(ils, f);
-
-        /*
-        fprintf(stderr, "WARN! write_InvertedLists: unsupported invlist type, "
-                "saving null invlist\n");
-        uint32_t h = fourcc ("il00");
-        WRITE1 (h);
-        */
-#endif // !_MSC_VER
     }
 }
 
@@ -409,13 +393,13 @@ void write_index (const Index *idx, IOWriter *f) {
         WRITE1 (h);
         write_index_header (imiq, f);
         write_ProductQuantizer (&imiq->pq, f);
-    } else if(const IndexRefineFlat * idxrf =
-              dynamic_cast<const IndexRefineFlat *> (idx)) {
+    } else if(const IndexRefine * idxrf =
+              dynamic_cast<const IndexRefine *> (idx)) {
         uint32_t h = fourcc ("IxRF");
         WRITE1 (h);
         write_index_header (idxrf, f);
         write_index (idxrf->base_index, f);
-        write_index (&idxrf->refine_index, f);
+        write_index (idxrf->refine_index, f);
         WRITE1 (idxrf->k_factor);
     } else if(const IndexIDMap * idxmap =
               dynamic_cast<const IndexIDMap *> (idx)) {
@@ -440,8 +424,33 @@ void write_index (const Index *idx, IOWriter *f) {
         write_index_header (idxhnsw, f);
         write_HNSW (&idxhnsw->hnsw, f);
         write_index (idxhnsw->storage, f);
+    } else if (const IndexPQFastScan *idxpqfs =
+               dynamic_cast<const IndexPQFastScan*>(idx)) {
+        uint32_t h = fourcc("IPfs");
+        WRITE1 (h);
+        write_index_header (idxpqfs, f);
+        write_ProductQuantizer (&idxpqfs->pq, f);
+        WRITE1 (idxpqfs->implem);
+        WRITE1 (idxpqfs->bbs);
+        WRITE1 (idxpqfs->qbs);
+        WRITE1 (idxpqfs->ntotal2);
+        WRITE1 (idxpqfs->M2);
+        WRITEVECTOR (idxpqfs->codes);
+    } else if (const IndexIVFPQFastScan * ivpq =
+              dynamic_cast<const IndexIVFPQFastScan *> (idx)) {
+        uint32_t h = fourcc ("IwPf");
+        WRITE1 (h);
+        write_ivf_header (ivpq, f);
+        WRITE1 (ivpq->by_residual);
+        WRITE1 (ivpq->code_size);
+        WRITE1 (ivpq->bbs);
+        WRITE1 (ivpq->M2);
+        WRITE1 (ivpq->implem);
+        WRITE1 (ivpq->qbs2);
+        write_ProductQuantizer (&ivpq->pq, f);
+        write_InvertedLists (ivpq->invlists, f);
     } else {
-      FAISS_THROW_MSG ("don't know how to serialize this type of index");
+        FAISS_THROW_MSG ("don't know how to serialize this type of index");
     }
 }
 

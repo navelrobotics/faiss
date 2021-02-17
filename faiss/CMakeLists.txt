@@ -7,7 +7,6 @@
 add_library(faiss
   AutoTune.cpp
   Clustering.cpp
-  DirectMap.cpp
   IVFlib.cpp
   Index.cpp
   Index2Layer.cpp
@@ -23,6 +22,8 @@ add_library(faiss
   IndexIVFFlat.cpp
   IndexIVFPQ.cpp
   IndexIVFPQR.cpp
+  IndexIVFPQFastScan.cpp
+  IndexPQFastScan.cpp
   IndexIVFSpectralHash.cpp
   IndexLSH.cpp
   IndexLattice.cpp
@@ -31,7 +32,7 @@ add_library(faiss
   IndexReplicas.cpp
   IndexScalarQuantizer.cpp
   IndexShards.cpp
-  InvertedLists.cpp
+  IndexRefine.cpp
   MatrixStats.cpp
   MetaIndexes.cpp
   VectorTransform.cpp
@@ -45,8 +46,15 @@ add_library(faiss
   impl/ScalarQuantizer.cpp
   impl/index_read.cpp
   impl/index_write.cpp
+  impl/pq4_fast_scan.cpp
+  impl/pq4_fast_scan_search_1.cpp
+  impl/pq4_fast_scan_search_qbs.cpp
   impl/io.cpp
   impl/lattice_Zn.cpp
+  invlists/DirectMap.cpp
+  invlists/InvertedLists.cpp
+  invlists/BlockInvertedLists.cpp
+  invlists/InvertedListsIOHook.cpp
   utils/Heap.cpp
   utils/WorkerThread.cpp
   utils/distances.cpp
@@ -54,6 +62,7 @@ add_library(faiss
   utils/extra_distances.cpp
   utils/hamming.cpp
   utils/partitioning.cpp
+  utils/quantize_lut.cpp
   utils/random.cpp
   utils/utils.cpp
 )
@@ -61,7 +70,6 @@ add_library(faiss
 set(FAISS_HEADERS
   AutoTune.h
   Clustering.h
-  DirectMap.h
   IVFlib.h
   Index.h
   Index2Layer.h
@@ -77,6 +85,8 @@ set(FAISS_HEADERS
   IndexIVFFlat.h
   IndexIVFPQ.h
   IndexIVFPQR.h
+  IndexIVFPQFastScan.h
+  IndexPQFastScan.h
   IndexIVFSpectralHash.h
   IndexLSH.h
   IndexLattice.h
@@ -85,7 +95,7 @@ set(FAISS_HEADERS
   IndexReplicas.h
   IndexScalarQuantizer.h
   IndexShards.h
-  InvertedLists.h
+  IndexRefine.h
   MatrixStats.h
   MetaIndexes.h
   MetricType.h
@@ -106,8 +116,15 @@ set(FAISS_HEADERS
   impl/io.h
   impl/io_macros.h
   impl/lattice_Zn.h
+  impl/pq4_fast_scan.h
+  impl/simd_result_handlers.h
   impl/platform_macros.h
+  invlists/InvertedLists.h
+  invlists/BlockInvertedLists.h
+  invlists/DirectMap.h
+  invlists/InvertedListsIOHook.h
   utils/Heap.h
+  utils/AlignedTable.h
   utils/WorkerThread.h
   utils/distances.h
   utils/extra_distances.h
@@ -115,18 +132,24 @@ set(FAISS_HEADERS
   utils/hamming.h
   utils/ordered_key_value.h
   utils/partitioning.h
+  utils/quantize_lut.h
   utils/random.h
   utils/simdlib.h
+  utils/simdlib_emulated.h
+  utils/simdlib_avx2.h
   utils/utils.h
 )
 
+# Export FAISS_HEADERS variable to parent scope.
+set(FAISS_HEADERS ${FAISS_HEADERS} PARENT_SCOPE)
+
 if(NOT WIN32)
-  target_sources(faiss PRIVATE OnDiskInvertedLists.cpp)
-  list(APPEND FAISS_HEADERS OnDiskInvertedLists.h)
+  target_sources(faiss PRIVATE invlists/OnDiskInvertedLists.cpp)
+  list(APPEND FAISS_HEADERS invlists/OnDiskInvertedLists.h)
 endif()
 
 if(FAISS_OPT_LEVEL STREQUAL "avx2")
-  target_compile_options(faiss PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mpopcnt>)
+  target_compile_options(faiss PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
   set_target_properties(faiss PROPERTIES OUTPUT_NAME "faiss_avx2")
 elseif(FAISS_OPT_LEVEL STREQUAL "sse4")
   target_compile_options(faiss PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4 -mpopcnt>)
@@ -164,15 +187,15 @@ endif()
 
 install(TARGETS faiss
   EXPORT faiss-targets
-  RUNTIME DESTINATION bin
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  INCLUDES DESTINATION include
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 foreach(header ${FAISS_HEADERS})
   get_filename_component(dir ${header} DIRECTORY )
   install(FILES ${header}
-    DESTINATION include/faiss/${dir}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/faiss/${dir}
   )
 endforeach()
 
@@ -189,9 +212,9 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/faiss-config.cmake.in
 )
 install(FILES ${PROJECT_BINARY_DIR}/cmake/faiss-config.cmake
   ${PROJECT_BINARY_DIR}/cmake/faiss-config-version.cmake
-  DESTINATION share/faiss
+  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/faiss
 )
 
 install(EXPORT faiss-targets
-  DESTINATION share/faiss
+  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/faiss
 )

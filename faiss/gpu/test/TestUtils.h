@@ -10,7 +10,7 @@
 
 #include <faiss/impl/FaissAssert.h>
 #include <faiss/Index.h>
-#include <faiss/InvertedLists.h>
+#include <faiss/invlists/InvertedLists.h>
 #include <initializer_list>
 #include <gtest/gtest.h>
 #include <cstring>
@@ -109,7 +109,9 @@ void testIVFEquality(A& cpuIndex, B& gpuIndex) {
     auto sc = faiss::InvertedLists::ScopedCodes(cpuLists, i);
     std::memcpy(cpuCodes.data(), sc.get(),
                 cpuLists->list_size(i) * cpuLists->code_size);
-    EXPECT_EQ(cpuCodes, gpuIndex.getListVectorData(i));
+
+    auto gpuCodes = gpuIndex.getListVectorData(i, false);
+    EXPECT_EQ(cpuCodes, gpuCodes);
 
     // Index equality
     std::vector<Index::idx_t> cpuIndices(cpuLists->list_size(i));

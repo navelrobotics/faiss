@@ -23,10 +23,12 @@ target_sources(faiss PRIVATE
   impl/BroadcastSum.cu
   impl/Distance.cu
   impl/FlatIndex.cu
+  impl/InterleavedCodes.cpp
   impl/IVFAppend.cu
   impl/IVFBase.cu
   impl/IVFFlat.cu
   impl/IVFFlatScan.cu
+  impl/IVFInterleaved.cu
   impl/IVFPQ.cu
   impl/IVFUtils.cu
   impl/IVFUtilsSelect1.cu
@@ -36,6 +38,14 @@ target_sources(faiss PRIVATE
   impl/PQScanMultiPassPrecomputed.cu
   impl/RemapIndices.cpp
   impl/VectorResidual.cu
+  impl/scan/IVFInterleaved1.cu
+  impl/scan/IVFInterleaved32.cu
+  impl/scan/IVFInterleaved64.cu
+  impl/scan/IVFInterleaved128.cu
+  impl/scan/IVFInterleaved256.cu
+  impl/scan/IVFInterleaved512.cu
+  impl/scan/IVFInterleaved1024.cu
+  impl/scan/IVFInterleaved2048.cu
   utils/BlockSelectFloat.cu
   utils/BlockSelectHalf.cu
   utils/DeviceUtils.cu
@@ -167,13 +177,20 @@ set(FAISS_GPU_HEADERS
   utils/warpselect/WarpSelectImpl.cuh
   utils/WarpShuffles.cuh
 )
+
+# Export FAISS_HEADERS variable to parent scope.
+set(FAISS_GPU_HEADERS ${FAISS_GPU_HEADERS} PARENT_SCOPE)
+
 foreach(header ${FAISS_GPU_HEADERS})
   get_filename_component(dir ${header} DIRECTORY )
   install(FILES ${header}
-    DESTINATION include/faiss/gpu/${dir}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/faiss/gpu/${dir}
   )
 endforeach()
 
 find_package(CUDAToolkit REQUIRED)
+
+find_package(OpenMP REQUIRED)
+target_link_libraries(faiss PRIVATE OpenMP::OpenMP_CXX)
 
 target_link_libraries(faiss PRIVATE CUDA::cudart CUDA::cublas)

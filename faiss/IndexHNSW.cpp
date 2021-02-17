@@ -277,7 +277,7 @@ IndexHNSW::~IndexHNSW() {
 void IndexHNSW::train(idx_t n, const float* x)
 {
     FAISS_THROW_IF_NOT_MSG(storage,
-       "Please use IndexHSNWFlat (or variants) instead of IndexHNSW directly");
+       "Please use IndexHNSWFlat (or variants) instead of IndexHNSW directly");
     // hnsw structure does not require training
     storage->train (n, x);
     is_trained = true;
@@ -288,7 +288,7 @@ void IndexHNSW::search (idx_t n, const float *x, idx_t k,
 
 {
     FAISS_THROW_IF_NOT_MSG(storage,
-       "Please use IndexHSNWFlat (or variants) instead of IndexHNSW directly");
+       "Please use IndexHNSWFlat (or variants) instead of IndexHNSW directly");
     size_t n1 = 0, n2 = 0, n3 = 0, ndis = 0, nreorder = 0;
 
     idx_t check_period = InterruptCallback::get_period_hint (
@@ -352,7 +352,7 @@ void IndexHNSW::search (idx_t n, const float *x, idx_t k,
 void IndexHNSW::add(idx_t n, const float *x)
 {
     FAISS_THROW_IF_NOT_MSG(storage,
-       "Please use IndexHSNWFlat (or variants) instead of IndexHNSW directly");
+       "Please use IndexHNSWFlat (or variants) instead of IndexHNSW directly");
     FAISS_THROW_IF_NOT(is_trained);
     int n0 = ntotal;
     storage->add(n, x);
@@ -1003,8 +1003,7 @@ int search_from_candidates_2(const HNSW & hnsw,
                     if (nres < k) {
                         faiss::maxheap_push (++nres, D, I, d, v1);
                     } else if (d < D[0]) {
-                        faiss::maxheap_pop (nres--, D, I);
-                        faiss::maxheap_push (++nres, D, I, d, v1);
+                        faiss::maxheap_replace_top (nres, D, I, d, v1);
                     }
                 }
                 vt.visited[v1] = vt.visno + 1;

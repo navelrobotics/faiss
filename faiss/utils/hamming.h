@@ -27,11 +27,6 @@
 
 #include <stdint.h>
 
-#ifdef _MSC_VER
-#include <intrin.h>
-#define __builtin_popcountl __popcnt64
-#endif // _MSC_VER
-
 #include <faiss/impl/platform_macros.h>
 #include <faiss/utils/Heap.h>
 
@@ -91,7 +86,7 @@ struct BitstringWriter {
     size_t i; // current bit offset
 
     // code_size in bytes
-    BitstringWriter(uint8_t *code, int code_size);
+    BitstringWriter(uint8_t *code, size_t code_size);
 
     // write the nbit low bits of x
     void write(uint64_t x, int nbit);
@@ -103,7 +98,7 @@ struct BitstringReader {
     size_t i;
 
     // code_size in bytes
-    BitstringReader(const uint8_t *code, int code_size);
+    BitstringReader(const uint8_t *code, size_t code_size);
 
     // read nbit bits from the code
     uint64_t read(int nbit);
