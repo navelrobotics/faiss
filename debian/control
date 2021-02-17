@@ -33,7 +33,7 @@ Description: efficient similarity search and clustering of dense vectors
  for Python/numpy. Some of the most useful algorithms are implemented on the
  GPU. It is developed by Facebook AI Research.
  .
- This package contains the development files.
+ This package contains the CPU-only version of the development files.
 
 Package: python3-faiss
 Architecture: any
@@ -47,4 +47,4 @@ Description: efficient similarity search and clustering of dense vectors
  for Python/numpy. Some of the most useful algorithms are implemented on the
  GPU. It is developed by Facebook AI Research.
  .
- This package contains the python interface.
+ This package contains the CPU-only version of the python interface.
