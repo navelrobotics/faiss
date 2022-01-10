@@ -1,3 +1,9 @@
+faiss (1.7.2-1) UNRELEASED; urgency=medium
+
+  * New upstream version 1.7.2
+
+ -- Mo Zhou <lumin@debian.org>  Mon, 10 Jan 2022 10:29:10 -0500
+
 faiss (1.7.0-1) unstable; urgency=medium
 
   * New upstream version 1.7.0
