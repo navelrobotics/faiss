@@ -4,7 +4,7 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-add_executable(faiss_test
+set(FAISS_TEST_SRC
   test_binary_flat.cpp
   test_dealloc_invlists.cpp
   test_ivfpq_codec.cpp
@@ -19,7 +19,16 @@ add_executable(faiss_test
   test_sliding_ivf.cpp
   test_threaded_index.cpp
   test_transfer_invlists.cpp
+  test_mem_leak.cpp
 )
+
+add_executable(faiss_test ${FAISS_TEST_SRC})
+
+if(FAISS_OPT_LEVEL STREQUAL "avx2")
+  target_link_libraries(faiss_test PRIVATE faiss_avx2)
+else()
+  target_link_libraries(faiss_test PRIVATE faiss)
+endif()
 
 include(FetchContent)
 FetchContent_Declare(googletest
@@ -31,7 +40,6 @@ FetchContent_MakeAvailable(googletest)
 find_package(OpenMP REQUIRED)
 
 target_link_libraries(faiss_test PRIVATE
-  faiss
   OpenMP::OpenMP_CXX
   gtest_main
 )
