@@ -1,8 +1,21 @@
-faiss (1.7.2-1) UNRELEASED; urgency=medium
+faiss (1.7.2-1) unstable; urgency=medium
 
+  * Team upload.
+
+  [ Mo Zhou ]
   * New upstream version 1.7.2
+  * Rebase existing patches.
+  * Update buildflags for CMake.
 
- -- Mo Zhou <lumin@debian.org>  Mon, 10 Jan 2022 10:29:10 -0500
+  [ Timo Röhling ]
+  * Fix SWIG FTBFS on 32 bit architectures
+  * Bump Standards-Version to 4.6.0
+  * Fix sections of binary packages
+  * Fix package descriptions
+  * Enable LFS
+  * Use dh-sequence-* to run dh_python3 and dh_numpy3
+
+ -- Timo Röhling <roehling@debian.org>  Sun, 06 Feb 2022 18:39:50 +0100
 
 faiss (1.7.0-1) unstable; urgency=medium
 
