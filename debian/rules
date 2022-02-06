@@ -7,7 +7,7 @@ BUILD_TESTING = OFF
 endif
 
 %:
-	dh $@ -Scmake -Bbuild --with python3
+	dh $@ --buildsystem=cmake --builddirectory=build
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
@@ -20,4 +20,4 @@ override_dh_auto_configure:
 execute_after_dh_auto_install:
 	cd build/faiss/python; \
 		python3 setup.py install --install-layout=deb \
-		--root=$(shell pwd)/debian/python3-faiss/
+		--root=$(CURDIR)/debian/python3-faiss/
