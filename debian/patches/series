@@ -1,1 +1,2 @@
 cmake-gtest.patch
+32bit-swig.patch

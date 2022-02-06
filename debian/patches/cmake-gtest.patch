@@ -1,7 +1,17 @@
-Index: faiss/CMakeLists.txt
+From: Debian Deep Learning Team <debian-ai@lists.debian.org>
+Date: Sun, 6 Feb 2022 12:19:35 +0100
+Subject: cmake-gtest
+
 ===================================================================
---- faiss.orig/CMakeLists.txt
-+++ faiss/CMakeLists.txt
+---
+ CMakeLists.txt       |  1 +
+ tests/CMakeLists.txt | 21 ++++++++++++++-------
+ 2 files changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a7b1fc6..14109c3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
 @@ -22,6 +22,7 @@ option(FAISS_OPT_LEVEL "" "generic")
  option(FAISS_ENABLE_GPU "Enable support for GPU indexes." ON)
  option(FAISS_ENABLE_PYTHON "Build Python extension." ON)
@@ -10,10 +20,10 @@ Index: faiss/CMakeLists.txt
  
  if(FAISS_ENABLE_GPU)
    set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
-Index: faiss/tests/CMakeLists.txt
-===================================================================
---- faiss.orig/tests/CMakeLists.txt
-+++ faiss/tests/CMakeLists.txt
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index b0bdfd0..5d8ae42 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
 @@ -30,18 +30,25 @@ else()
    target_link_libraries(faiss_test PRIVATE faiss)
  endif()

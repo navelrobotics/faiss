@@ -1,0 +1,31 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Sun, 6 Feb 2022 12:23:54 +0100
+Subject: Fix SWIG FTBFS on 32 bit architectures
+
+---
+ faiss/python/CMakeLists.txt | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/faiss/python/CMakeLists.txt b/faiss/python/CMakeLists.txt
+index e403065..a0952a8 100644
+--- a/faiss/python/CMakeLists.txt
++++ b/faiss/python/CMakeLists.txt
+@@ -25,9 +25,15 @@ macro(configure_swigfaiss source)
+     USE_TARGET_INCLUDE_DIRECTORIES TRUE
+   )
+   if(NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND NOT WIN32)
+-    set_source_files_properties(${source} PROPERTIES
+-      SWIG_FLAGS -DSWIGWORDSIZE64
+-    )
++    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
++      set_source_files_properties(${source} PROPERTIES
++        SWIG_FLAGS -DSWIGWORDSIZE64
++      )
++    else()
++      set_source_files_properties(${source} PROPERTIES
++        SWIG_FLAGS -DSWIGWORDSIZE32
++      )
++    endif()
+   endif()
+   if(WIN32)
+     set_source_files_properties(${source} PROPERTIES
