@@ -22,6 +22,7 @@ Build-Depends: cmake,
                swig
 
 Package: libfaiss-dev
+Section: libdevel
 Architecture: any
 Depends: ${misc:Depends}
 Recommends: libopenblas-dev | libblis-dev | intel-mkl | libblas-dev
@@ -36,6 +37,7 @@ Description: efficient similarity search and clustering of dense vectors
  This package contains the CPU-only version of the development files.
 
 Package: python3-faiss
+Section: python
 Architecture: any
 Depends: ${misc:Depends}, ${python3:Depends}, ${shlibs:Depends}
 Recommends: libopenblas0 | libblis3 | libmkl-rt | libblas.so.3
