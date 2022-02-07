@@ -1,8 +1,7 @@
 From: Debian Deep Learning Team <debian-ai@lists.debian.org>
 Date: Sun, 6 Feb 2022 12:19:35 +0100
-Subject: cmake-gtest
+Subject: Use system GTest
 
-===================================================================
 ---
  CMakeLists.txt       |  1 +
  tests/CMakeLists.txt | 21 ++++++++++++++-------
