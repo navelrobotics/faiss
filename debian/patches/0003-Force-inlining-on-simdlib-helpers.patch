@@ -1,0 +1,42 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Mon, 7 Feb 2022 08:12:11 +0100
+Subject: Force inlining on simdlib helpers
+
+The helper functions are called with intrinsics as function
+arguments, but intrinsics cannot have their address taken, so
+these calls only work if they are inlined by the compiler.
+---
+ faiss/utils/simdlib_neon.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/faiss/utils/simdlib_neon.h b/faiss/utils/simdlib_neon.h
+index a8f2b84..32fabef 100644
+--- a/faiss/utils/simdlib_neon.h
++++ b/faiss/utils/simdlib_neon.h
+@@ -120,7 +120,7 @@ static inline std::string bin(const S& simd) {
+ }
+ 
+ template <typename D, typename F, typename T>
+-static inline void set1(D& d, F&& f, T t) {
++static __attribute__((always_inline)) inline void set1(D& d, F&& f, T t) {
+     const auto v = f(t);
+     d.val[0] = v;
+     d.val[1] = v;
+@@ -143,7 +143,7 @@ static inline std::string elements_to_string(const char* fmt, const S& simd) {
+ }
+ 
+ template <typename T, typename F>
+-static inline T unary_func(const T& a, F&& f) {
++static __attribute__((always_inline)) inline T unary_func(const T& a, F&& f) {
+     T t;
+     t.val[0] = f(a.val[0]);
+     t.val[1] = f(a.val[1]);
+@@ -151,7 +151,7 @@ static inline T unary_func(const T& a, F&& f) {
+ }
+ 
+ template <typename T, typename F>
+-static inline T binary_func(const T& a, const T& b, F&& f) {
++static __attribute__((always_inline)) inline T binary_func(const T& a, const T& b, F&& f) {
+     T t;
+     t.val[0] = f(a.val[0], b.val[0]);
+     t.val[1] = f(a.val[1], b.val[1]);

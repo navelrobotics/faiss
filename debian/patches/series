@@ -1,2 +1,3 @@
 0001-Use-system-GTest.patch
 0002-Use-SWIGWORDSIZE32-on-32-bit-architectures.patch
+0003-Force-inlining-on-simdlib-helpers.patch
