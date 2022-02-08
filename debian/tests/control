@@ -1,2 +1,6 @@
 Tests: test.py
 Restrictions: allow-stderr
+
+Tests: cmaketest
+Restrictions: allow-stderr
+Depends: libfaiss-dev, cmake, libgtest-dev, g++ | c++-compiler

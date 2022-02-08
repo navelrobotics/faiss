@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+
+cp -r tests "$AUTOPKGTEST_TMP"
+cd "$AUTOPKGTEST_TMP/tests"
+sed -i -e '1i \
+cmake_minimum_required(VERSION 3.17)\
+project(autopkgtest)\
+find_package(faiss REQUIRED)' CMakeLists.txt
+set -x
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DFAISS_USE_SYSTEM_GTEST=ON
+make VERBOSE=ON
+./faiss_test
+
