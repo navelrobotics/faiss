@@ -25,6 +25,7 @@ Build-Depends: cmake,
 Package: libfaiss-dev
 Section: libdevel
 Architecture: any
+Multi-Arch: same
 Depends: ${misc:Depends}
 Recommends: libopenblas-dev | libblis-dev | intel-mkl | libblas-dev
 Description: efficient similarity search and clustering of dense vectors
