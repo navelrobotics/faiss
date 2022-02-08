@@ -26,8 +26,7 @@ Package: libfaiss-dev
 Section: libdevel
 Architecture: any
 Multi-Arch: same
-Depends: ${misc:Depends}
-Recommends: libopenblas-dev | libblis-dev | intel-mkl | libblas-dev
+Depends: ${misc:Depends}, libblas-dev | libblas.so, liblapack-dev | liblapack.so
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
@@ -42,7 +41,6 @@ Package: python3-faiss
 Section: python
 Architecture: any
 Depends: ${misc:Depends}, ${python3:Depends}, ${shlibs:Depends}
-Recommends: libopenblas0 | libblis3 | libmkl-rt | libblas.so.3
 Description: Python 3 module for efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
