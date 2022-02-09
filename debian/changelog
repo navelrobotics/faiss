@@ -1,3 +1,10 @@
+faiss (1.7.2-5) unstable; urgency=medium
+
+  * Team upload.
+  * Skip long-running MEAM_LEAK.* test during build
+
+ -- Timo Röhling <roehling@debian.org>  Wed, 09 Feb 2022 08:00:49 +0100
+
 faiss (1.7.2-4) unstable; urgency=medium
 
   * Team upload.
