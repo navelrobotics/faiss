@@ -1,0 +1,75 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Wed, 9 Feb 2022 01:16:09 +0100
+Subject: Fix implementation for 32 bit size_t
+
+---
+ faiss/index_factory.cpp                | 2 +-
+ faiss/invlists/OnDiskInvertedLists.cpp | 7 ++++---
+ faiss/utils/utils.cpp                  | 2 +-
+ 3 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
+index 10de493..74ca988 100644
+--- a/faiss/index_factory.cpp
++++ b/faiss/index_factory.cpp
+@@ -596,7 +596,7 @@ std::unique_ptr<Index> index_factory_sub(
+     }
+ 
+     if (verbose) {
+-        printf("after () normalization: %s %ld parenthesis indexes d=%d\n",
++        printf("after () normalization: %s %zu parenthesis indexes d=%d\n",
+                description.c_str(),
+                parenthesis_indexes.size(),
+                d);
+diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
+index 445798b..934107b 100644
+--- a/faiss/invlists/OnDiskInvertedLists.cpp
++++ b/faiss/invlists/OnDiskInvertedLists.cpp
+@@ -11,6 +11,7 @@
+ 
+ #include <pthread.h>
+ 
++#include <limits>
+ #include <unordered_set>
+ 
+ #include <sys/mman.h>
+@@ -324,7 +325,7 @@ void OnDiskInvertedLists::update_totsize(size_t new_size) {
+ 
+     FAISS_THROW_IF_NOT_FMT(
+             err == 0,
+-            "truncate %s to %ld: %s",
++            "truncate %s to %zu: %s",
+             filename.c_str(),
+             totsize,
+             strerror(errno));
+@@ -523,7 +524,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+         it++;
+     }
+ 
+-    size_t inf = 1UL << 60;
++    size_t inf = (std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() >> 1)) >> 1;
+ 
+     size_t end_prev = inf;
+     if (it != slots.begin()) {
+@@ -532,7 +533,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+         end_prev = prev->offset + prev->capacity;
+     }
+ 
+-    size_t begin_next = 1L << 60;
++    size_t begin_next = inf;
+     if (it != slots.end()) {
+         begin_next = it->offset;
+     }
+diff --git a/faiss/utils/utils.cpp b/faiss/utils/utils.cpp
+index 013bf38..175a537 100644
+--- a/faiss/utils/utils.cpp
++++ b/faiss/utils/utils.cpp
+@@ -160,7 +160,7 @@ size_t get_mem_usage_kb() {
+         char buf[256];
+         if (!fgets(buf, 256, f))
+             break;
+-        if (sscanf(buf, "VmRSS: %ld kB", &sz) == 1)
++        if (sscanf(buf, "VmRSS: %zu kB", &sz) == 1)
+             break;
+     }
+     fclose(f);

@@ -2,3 +2,4 @@
 0002-Use-SWIGWORDSIZE32-on-32-bit-architectures.patch
 0003-Force-inlining-on-simdlib-helpers.patch
 0004-Fix-CMake-package-export.patch
+0005-Fix-implementation-for-32-bit-size_t.patch
