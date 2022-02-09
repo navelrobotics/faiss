@@ -11,6 +11,7 @@ override_dh_auto_configure:
 		-DFAISS_ENABLE_PYTHON=ON \
 		-DFAISS_ENABLE_C_API=ON \
 		-DFAISS_USE_SYSTEM_GTEST=ON \
+		-DFAISS_GTEST_FILTER="-MEM_LEAK.*" \
 		-DBUILD_TESTING=$(BUILD_TESTING)
 
 execute_after_dh_auto_install:

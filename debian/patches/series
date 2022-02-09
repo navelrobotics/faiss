@@ -4,3 +4,4 @@
 0004-Fix-CMake-package-export.patch
 0005-Fix-implementation-for-32-bit-size_t.patch
 0006-Fix-floating-point-comparisons-in-unit-tests.patch
+0007-Add-GTest-filter.patch

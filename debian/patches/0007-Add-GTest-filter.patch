@@ -1,0 +1,18 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Wed, 9 Feb 2022 08:08:13 +0100
+Subject: Add GTest filter
+
+---
+ tests/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 5d8ae42..2e377a2 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -53,4 +53,4 @@ target_link_libraries(faiss_test PRIVATE
+ 
+ # Defines `gtest_discover_tests()`.
+ include(GoogleTest)
+-gtest_discover_tests(faiss_test)
++gtest_discover_tests(faiss_test TEST_FILTER "${FAISS_GTEST_FILTER}")
