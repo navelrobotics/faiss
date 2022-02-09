@@ -1,3 +1,12 @@
+faiss (1.7.2-4) unstable; urgency=medium
+
+  * Team upload.
+  * Fix implementation for 32 bit size_t
+  * Enable unit tests unconditionally again
+  * Fix floating point comparisons in unit tests
+
+ -- Timo Röhling <roehling@debian.org>  Wed, 09 Feb 2022 01:38:46 +0100
+
 faiss (1.7.2-3) unstable; urgency=medium
 
   * Team upload.
