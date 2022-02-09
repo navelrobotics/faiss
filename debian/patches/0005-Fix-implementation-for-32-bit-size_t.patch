@@ -1,12 +1,13 @@
 From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
-Date: Wed, 9 Feb 2022 01:16:09 +0100
+Date: Wed, 9 Feb 2022 01:28:47 +0100
 Subject: Fix implementation for 32 bit size_t
 
 ---
  faiss/index_factory.cpp                | 2 +-
+ faiss/invlists/DirectMap.cpp           | 2 +-
  faiss/invlists/OnDiskInvertedLists.cpp | 7 ++++---
  faiss/utils/utils.cpp                  | 2 +-
- 3 files changed, 6 insertions(+), 5 deletions(-)
+ 4 files changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
 index 10de493..74ca988 100644
@@ -21,6 +22,19 @@ index 10de493..74ca988 100644
                 description.c_str(),
                 parenthesis_indexes.size(),
                 d);
+diff --git a/faiss/invlists/DirectMap.cpp b/faiss/invlists/DirectMap.cpp
+index e4e5eb5..7ce3034 100644
+--- a/faiss/invlists/DirectMap.cpp
++++ b/faiss/invlists/DirectMap.cpp
+@@ -198,7 +198,7 @@ size_t DirectMap::remove_ids(const IDSelector& sel, InvertedLists* invlists) {
+                             last_id,
+                             ScopedCodes(invlists, list_no, last).get());
+                     // update hash entry for last element
+-                    hashtable[last_id] = list_no << 32 | offset;
++                    hashtable[last_id] = idx_t(list_no) << 32 | idx_t(offset);
+                 }
+                 invlists->resize(list_no, last);
+                 nremove++;
 diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
 index 445798b..934107b 100644
 --- a/faiss/invlists/OnDiskInvertedLists.cpp

@@ -1,10 +1,6 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
-ifneq (,$(filter $(DEB_HOST_ARCH),amd64))
-BUILD_TESTING = ON
-else
-BUILD_TESTING = OFF
-endif
+BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
 
 %:
 	dh $@ --buildsystem=cmake --builddirectory=build
