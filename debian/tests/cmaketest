@@ -12,5 +12,5 @@ mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DFAISS_USE_SYSTEM_GTEST=ON
 make VERBOSE=ON
-./faiss_test
+./faiss_test --gtest_filter="-MEM_LEAK.*"
 
