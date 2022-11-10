@@ -29,6 +29,13 @@
 #include <faiss/impl/FaissAssert.h>
 
 #include <faiss/impl/AuxIndexStructures.h>
+#include <faiss/impl/IDSelector.h>
+
+#include <faiss/impl/ProductQuantizer.h>
+
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
 
 namespace faiss {
 
@@ -254,13 +261,16 @@ void IndexIVFPQ::sa_decode(idx_t n, const uint8_t* codes, float* x) const {
     }
 }
 
+// block size used in IndexIVFPQ::add_core_o
+int index_ivfpq_add_core_o_bs = 32768;
+
 void IndexIVFPQ::add_core_o(
         idx_t n,
         const float* x,
         const idx_t* xids,
         float* residuals_2,
         const idx_t* precomputed_idx) {
-    idx_t bs = 32768;
+    idx_t bs = index_ivfpq_add_core_o_bs;
     if (n > bs) {
         for (idx_t i0 = 0; i0 < n; i0 += bs) {
             idx_t i1 = std::min(i0 + bs, n);
@@ -793,10 +803,13 @@ struct QueryTables {
     }
 };
 
-template <class C>
+// This way of handling the sleector is not optimal since all distances
+// are computed even if the id would filter it out.
+template <class C, bool use_sel>
 struct KnnSearchResults {
     idx_t key;
     const idx_t* ids;
+    const IDSelector* sel;
 
     // heap params
     size_t k;
@@ -804,6 +817,10 @@ struct KnnSearchResults {
     idx_t* heap_ids;
 
     size_t nup;
+
+    inline bool skip_entry(idx_t j) {
+        return use_sel && !sel->is_member(ids[j]);
+    }
 
     inline void add(idx_t j, float dis) {
         if (C::cmp(heap_sim[0], dis)) {
@@ -814,14 +831,19 @@ struct KnnSearchResults {
     }
 };
 
-template <class C>
+template <class C, bool use_sel>
 struct RangeSearchResults {
     idx_t key;
     const idx_t* ids;
+    const IDSelector* sel;
 
     // wrapped result structure
     float radius;
     RangeQueryResult& rres;
+
+    inline bool skip_entry(idx_t j) {
+        return use_sel && !sel->is_member(ids[j]);
+    }
 
     inline void add(idx_t j, float dis) {
         if (C::cmp(radius, dis)) {
@@ -864,23 +886,152 @@ struct IVFPQScannerT : QueryTables {
      * Scaning the codes: simple PQ scan.
      *****************************************************/
 
-    /// version of the scan where we use precomputed tables
+#ifdef __AVX2__
+    /// Returns the distance to a single code.
+    /// General-purpose version.
+    template <class SearchResultType, typename T = PQDecoder>
+    typename std::enable_if<!(std::is_same<T, PQDecoder8>::value), float>::
+            type inline distance_single_code(const uint8_t* code) const {
+        PQDecoder decoder(code, pq.nbits);
+
+        const float* tab = sim_table;
+        float result = 0;
+
+        for (size_t m = 0; m < pq.M; m++) {
+            result += tab[decoder.decode()];
+            tab += pq.ksub;
+        }
+
+        return result;
+    }
+
+    /// Returns the distance to a single code.
+    /// Specialized AVX2 PQDecoder8 version.
+    template <class SearchResultType, typename T = PQDecoder>
+    typename std::enable_if<(std::is_same<T, PQDecoder8>::value), float>::
+            type inline distance_single_code(const uint8_t* code) const {
+        float result = 0;
+
+        size_t m = 0;
+        const size_t pqM16 = pq.M / 16;
+
+        const float* tab = sim_table;
+
+        if (pqM16 > 0) {
+            // process 16 values per loop
+
+            const __m256i ksub = _mm256_set1_epi32(pq.ksub);
+            __m256i offsets_0 = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+            offsets_0 = _mm256_mullo_epi32(offsets_0, ksub);
+
+            // accumulators of partial sums
+            __m256 partialSum = _mm256_setzero_ps();
+
+            // loop
+            for (m = 0; m < pqM16 * 16; m += 16) {
+                // load 16 uint8 values
+                const __m128i mm1 =
+                        _mm_loadu_si128((const __m128i_u*)(code + m));
+                {
+                    // convert uint8 values (low part of __m128i) to int32
+                    // values
+                    const __m256i idx1 = _mm256_cvtepu8_epi32(mm1);
+
+                    // add offsets
+                    const __m256i indices_to_read_from =
+                            _mm256_add_epi32(idx1, offsets_0);
+
+                    // gather 8 values, similar to 8 operations of tab[idx]
+                    __m256 collected = _mm256_i32gather_ps(
+                            tab, indices_to_read_from, sizeof(float));
+                    tab += pq.ksub * 8;
+
+                    // collect partial sums
+                    partialSum = _mm256_add_ps(partialSum, collected);
+                }
+
+                // move high 8 uint8 to low ones
+                const __m128i mm2 =
+                        _mm_unpackhi_epi64(mm1, _mm_setzero_si128());
+                {
+                    // convert uint8 values (low part of __m128i) to int32
+                    // values
+                    const __m256i idx1 = _mm256_cvtepu8_epi32(mm2);
+
+                    // add offsets
+                    const __m256i indices_to_read_from =
+                            _mm256_add_epi32(idx1, offsets_0);
+
+                    // gather 8 values, similar to 8 operations of tab[idx]
+                    __m256 collected = _mm256_i32gather_ps(
+                            tab, indices_to_read_from, sizeof(float));
+                    tab += pq.ksub * 8;
+
+                    // collect partial sums
+                    partialSum = _mm256_add_ps(partialSum, collected);
+                }
+            }
+
+            // horizontal sum for partialSum
+            const __m256 h0 = _mm256_hadd_ps(partialSum, partialSum);
+            const __m256 h1 = _mm256_hadd_ps(h0, h0);
+
+            // extract high and low __m128 regs from __m256
+            const __m128 h2 = _mm256_extractf128_ps(h1, 1);
+            const __m128 h3 = _mm256_castps256_ps128(h1);
+
+            // get a final hsum into all 4 regs
+            const __m128 h4 = _mm_add_ss(h2, h3);
+
+            // extract f[0] from __m128
+            const float hsum = _mm_cvtss_f32(h4);
+            result += hsum;
+        }
+
+        //
+        if (m < pq.M) {
+            // process leftovers
+            PQDecoder decoder(code + m, pq.nbits);
+
+            for (; m < pq.M; m++) {
+                result += tab[decoder.decode()];
+                tab += pq.ksub;
+            }
+        }
+
+        return result;
+    }
+
+#else
+    /// Returns the distance to a single code.
+    /// General-purpose version.
+    template <class SearchResultType>
+    inline float distance_single_code(const uint8_t* code) const {
+        PQDecoder decoder(code, pq.nbits);
+
+        const float* tab = sim_table;
+        float result = 0;
+
+        for (size_t m = 0; m < pq.M; m++) {
+            result += tab[decoder.decode()];
+            tab += pq.ksub;
+        }
+
+        return result;
+    }
+#endif
+
+    /// version of the scan where we use precomputed tables.
     template <class SearchResultType>
     void scan_list_with_table(
             size_t ncode,
             const uint8_t* codes,
             SearchResultType& res) const {
-        for (size_t j = 0; j < ncode; j++) {
-            PQDecoder decoder(codes, pq.nbits);
-            codes += pq.code_size;
-            float dis = dis0;
-            const float* tab = sim_table;
-
-            for (size_t m = 0; m < pq.M; m++) {
-                dis += tab[decoder.decode()];
-                tab += pq.ksub;
+        for (size_t j = 0; j < ncode; j++, codes += pq.code_size) {
+            if (res.skip_entry(j)) {
+                continue;
             }
-
+            float dis = dis0 + distance_single_code<SearchResultType>(codes);
             res.add(j, dis);
         }
     }
@@ -892,10 +1043,11 @@ struct IVFPQScannerT : QueryTables {
             size_t ncode,
             const uint8_t* codes,
             SearchResultType& res) const {
-        for (size_t j = 0; j < ncode; j++) {
+        for (size_t j = 0; j < ncode; j++, codes += pq.code_size) {
+            if (res.skip_entry(j)) {
+                continue;
+            }
             PQDecoder decoder(codes, pq.nbits);
-            codes += pq.code_size;
-
             float dis = dis0;
             const float* tab = sim_table_2;
 
@@ -929,9 +1081,11 @@ struct IVFPQScannerT : QueryTables {
             dis0 = 0;
         }
 
-        for (size_t j = 0; j < ncode; j++) {
+        for (size_t j = 0; j < ncode; j++, codes += pq.code_size) {
+            if (res.skip_entry(j)) {
+                continue;
+            }
             pq.decode(codes, decoded_vec);
-            codes += pq.code_size;
 
             float dis;
             if (METRIC_TYPE == METRIC_INNER_PRODUCT) {
@@ -959,24 +1113,20 @@ struct IVFPQScannerT : QueryTables {
 
         HammingComputer hc(q_code.data(), code_size);
 
-        for (size_t j = 0; j < ncode; j++) {
+        for (size_t j = 0; j < ncode; j++, codes += code_size) {
+            if (res.skip_entry(j)) {
+                continue;
+            }
             const uint8_t* b_code = codes;
             int hd = hc.hamming(b_code);
             if (hd < ht) {
                 n_hamming_pass++;
-                PQDecoder decoder(codes, pq.nbits);
 
-                float dis = dis0;
-                const float* tab = sim_table;
-
-                for (size_t m = 0; m < pq.M; m++) {
-                    dis += tab[decoder.decode()];
-                    tab += pq.ksub;
-                }
+                float dis =
+                        dis0 + distance_single_code<SearchResultType>(codes);
 
                 res.add(j, dis);
             }
-            codes += code_size;
         }
 #pragma omp critical
         { indexIVFPQ_stats.n_hamming_pass += n_hamming_pass; }
@@ -1010,21 +1160,32 @@ struct IVFPQScannerT : QueryTables {
 };
 
 /* We put as many parameters as possible in template. Hopefully the
- * gain in runtime is worth the code bloat. C is the comparator < or
- * >, it is directly related to METRIC_TYPE. precompute_mode is how
- * much we precompute (2 = precompute distance tables, 1 = precompute
- * pointers to distances, 0 = compute distances one by one).
- * Currently only 2 is supported */
-template <MetricType METRIC_TYPE, class C, class PQDecoder>
+ * gain in runtime is worth the code bloat.
+ *
+ * C is the comparator < or >, it is directly related to METRIC_TYPE.
+ *
+ * precompute_mode is how much we precompute (2 = precompute distance tables,
+ * 1 = precompute pointers to distances, 0 = compute distances one by one).
+ * Currently only 2 is supported
+ *
+ * use_sel: store or ignore the IDSelector
+ */
+template <MetricType METRIC_TYPE, class C, class PQDecoder, bool use_sel>
 struct IVFPQScanner : IVFPQScannerT<Index::idx_t, METRIC_TYPE, PQDecoder>,
                       InvertedListScanner {
     int precompute_mode;
+    const IDSelector* sel;
 
-    IVFPQScanner(const IndexIVFPQ& ivfpq, bool store_pairs, int precompute_mode)
+    IVFPQScanner(
+            const IndexIVFPQ& ivfpq,
+            bool store_pairs,
+            int precompute_mode,
+            const IDSelector* sel)
             : IVFPQScannerT<Index::idx_t, METRIC_TYPE, PQDecoder>(
                       ivfpq,
                       nullptr),
-              precompute_mode(precompute_mode) {
+              precompute_mode(precompute_mode),
+              sel(sel) {
         this->store_pairs = store_pairs;
     }
 
@@ -1057,9 +1218,10 @@ struct IVFPQScanner : IVFPQScannerT<Index::idx_t, METRIC_TYPE, PQDecoder>,
             float* heap_sim,
             idx_t* heap_ids,
             size_t k) const override {
-        KnnSearchResults<C> res = {
+        KnnSearchResults<C, use_sel> res = {
                 /* key */ this->key,
                 /* ids */ this->store_pairs ? nullptr : ids,
+                /* sel */ this->sel,
                 /* k */ k,
                 /* heap_sim */ heap_sim,
                 /* heap_ids */ heap_ids,
@@ -1086,9 +1248,10 @@ struct IVFPQScanner : IVFPQScannerT<Index::idx_t, METRIC_TYPE, PQDecoder>,
             const idx_t* ids,
             float radius,
             RangeQueryResult& rres) const override {
-        RangeSearchResults<C> res = {
+        RangeSearchResults<C, use_sel> res = {
                 /* key */ this->key,
                 /* ids */ this->store_pairs ? nullptr : ids,
+                /* sel */ this->sel,
                 /* radius */ radius,
                 /* rres */ rres};
 
@@ -1107,32 +1270,53 @@ struct IVFPQScanner : IVFPQScannerT<Index::idx_t, METRIC_TYPE, PQDecoder>,
     }
 };
 
-template <class PQDecoder>
+template <class PQDecoder, bool use_sel>
 InvertedListScanner* get_InvertedListScanner1(
         const IndexIVFPQ& index,
-        bool store_pairs) {
+        bool store_pairs,
+        const IDSelector* sel) {
     if (index.metric_type == METRIC_INNER_PRODUCT) {
         return new IVFPQScanner<
                 METRIC_INNER_PRODUCT,
                 CMin<float, idx_t>,
-                PQDecoder>(index, store_pairs, 2);
+                PQDecoder,
+                use_sel>(index, store_pairs, 2, sel);
     } else if (index.metric_type == METRIC_L2) {
-        return new IVFPQScanner<METRIC_L2, CMax<float, idx_t>, PQDecoder>(
-                index, store_pairs, 2);
+        return new IVFPQScanner<
+                METRIC_L2,
+                CMax<float, idx_t>,
+                PQDecoder,
+                use_sel>(index, store_pairs, 2, sel);
     }
     return nullptr;
+}
+
+template <bool use_sel>
+InvertedListScanner* get_InvertedListScanner2(
+        const IndexIVFPQ& index,
+        bool store_pairs,
+        const IDSelector* sel) {
+    if (index.pq.nbits == 8) {
+        return get_InvertedListScanner1<PQDecoder8, use_sel>(
+                index, store_pairs, sel);
+    } else if (index.pq.nbits == 16) {
+        return get_InvertedListScanner1<PQDecoder16, use_sel>(
+                index, store_pairs, sel);
+    } else {
+        return get_InvertedListScanner1<PQDecoderGeneric, use_sel>(
+                index, store_pairs, sel);
+    }
 }
 
 } // anonymous namespace
 
 InvertedListScanner* IndexIVFPQ::get_InvertedListScanner(
-        bool store_pairs) const {
-    if (pq.nbits == 8) {
-        return get_InvertedListScanner1<PQDecoder8>(*this, store_pairs);
-    } else if (pq.nbits == 16) {
-        return get_InvertedListScanner1<PQDecoder16>(*this, store_pairs);
+        bool store_pairs,
+        const IDSelector* sel) const {
+    if (sel) {
+        return get_InvertedListScanner2<true>(*this, store_pairs, sel);
     } else {
-        return get_InvertedListScanner1<PQDecoderGeneric>(*this, store_pairs);
+        return get_InvertedListScanner2<false>(*this, store_pairs, sel);
     }
     return nullptr;
 }

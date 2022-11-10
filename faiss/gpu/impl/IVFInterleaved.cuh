@@ -12,13 +12,13 @@
 #include <faiss/gpu/GpuResources.h>
 #include <faiss/gpu/utils/DeviceUtils.h>
 #include <faiss/gpu/utils/StaticUtils.h>
-#include <thrust/device_vector.h>
 #include <faiss/gpu/impl/DistanceUtils.cuh>
 #include <faiss/gpu/impl/GpuScalarQuantizer.cuh>
 #include <faiss/gpu/utils/Comparators.cuh>
 #include <faiss/gpu/utils/ConversionOperators.cuh>
 #include <faiss/gpu/utils/DeviceDefs.cuh>
 #include <faiss/gpu/utils/DeviceTensor.cuh>
+#include <faiss/gpu/utils/DeviceVector.cuh>
 #include <faiss/gpu/utils/Float16.cuh>
 #include <faiss/gpu/utils/MathOperators.cuh>
 #include <faiss/gpu/utils/PtxUtils.cuh>
@@ -40,7 +40,7 @@ template <
 __global__ void ivfInterleavedScan(
         Tensor<float, 2, true> queries,
         Tensor<float, 3, true> residualBase,
-        Tensor<int, 2, true> listIds,
+        Tensor<Index::idx_t, 2, true> listIds,
         void** allListData,
         int* listLengths,
         Codec codec,
@@ -55,7 +55,7 @@ __global__ void ivfInterleavedScan(
 
     int queryId = blockIdx.y;
     int probeId = blockIdx.x;
-    int listId = listIds[queryId][probeId];
+    Index::idx_t listId = listIds[queryId][probeId];
 
     // Safety guard in case NaNs in input cause no list ID to be generated, or
     // we have more nprobe than nlist
@@ -227,8 +227,8 @@ __global__ void ivfInterleavedScan(
                     queries,                                                   \
                     residualBase,                                              \
                     listIds,                                                   \
-                    listData.data().get(),                                     \
-                    listLengths.data().get(),                                  \
+                    listData.data(),                                           \
+                    listLengths.data(),                                        \
                     codec,                                                     \
                     metric,                                                    \
                     k,                                                         \
@@ -245,8 +245,8 @@ __global__ void ivfInterleavedScan(
                     queries,                                                   \
                     residualBase,                                              \
                     listIds,                                                   \
-                    listData.data().get(),                                     \
-                    listLengths.data().get(),                                  \
+                    listData.data(),                                           \
+                    listLengths.data(),                                        \
                     codec,                                                     \
                     metric,                                                    \
                     k,                                                         \
@@ -409,11 +409,11 @@ __global__ void ivfInterleavedScan(
 // with all implementations
 void runIVFInterleavedScan(
         Tensor<float, 2, true>& queries,
-        Tensor<int, 2, true>& listIds,
-        thrust::device_vector<void*>& listData,
-        thrust::device_vector<void*>& listIndices,
+        Tensor<Index::idx_t, 2, true>& listIds,
+        DeviceVector<void*>& listData,
+        DeviceVector<void*>& listIndices,
         IndicesOptions indicesOptions,
-        thrust::device_vector<int>& listLengths,
+        DeviceVector<int>& listLengths,
         int k,
         faiss::MetricType metric,
         bool useResidual,
@@ -430,9 +430,9 @@ void runIVFInterleavedScan(
 void runIVFInterleavedScan2(
         Tensor<float, 3, true>& distanceIn,
         Tensor<int, 3, true>& indicesIn,
-        Tensor<int, 2, true>& listIds,
+        Tensor<Index::idx_t, 2, true>& listIds,
         int k,
-        thrust::device_vector<void*>& listIndices,
+        DeviceVector<void*>& listIndices,
         IndicesOptions indicesOptions,
         bool dir,
         Tensor<float, 2, true>& distanceOut,

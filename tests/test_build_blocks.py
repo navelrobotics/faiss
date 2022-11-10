@@ -325,6 +325,32 @@ class TestScalarQuantizer(unittest.TestCase):
                     # print(dis, D[i, j])
                     assert abs(D[i, j] - dis) / dis < 1e-5
 
+    def test_reconstruct(self):
+        self.do_reconstruct(True)
+
+    def test_reconstruct_no_residual(self):
+        self.do_reconstruct(False)
+
+    def do_reconstruct(self, by_residual):
+        d = 32
+        xt, xb, xq = get_dataset_2(d, 100, 5, 5)
+
+        index = faiss.index_factory(d, "IVF10,SQ8")
+        index.by_residual = by_residual
+        index.train(xt)
+        index.add(xb)
+        index.nprobe = 10
+        D, I = index.search(xq, 4)
+        xb2 = index.reconstruct_n(0, index.ntotal)
+        for i in range(5):
+            for j in range(4):
+                self.assertAlmostEqual(
+                    ((xq[i] - xb2[I[i, j]]) ** 2).sum(),
+                    D[i, j],
+                    places=4
+                )
+
+
 class TestRandom(unittest.TestCase):
 
     def test_rand(self):
@@ -339,6 +365,24 @@ class TestRandom(unittest.TestCase):
         c = np.bincount(x, minlength=100)
         print(c)
         assert c.max() - c.min() < 50 * 2
+
+    def test_rand_vector(self):
+        """ test if the smooth_vectors function is reasonably compressible with
+        a small PQ """
+        x = faiss.rand_smooth_vectors(1300, 32)
+        xt = x[:1000]
+        xb = x[1000:1200]
+        xq = x[1200:]
+        _, gt = faiss.knn(xq, xb, 10)
+        index = faiss.IndexPQ(32, 4, 4)
+        index.train(xt)
+        index.add(xb)
+        D, I = index.search(xq, 10)
+        ninter = faiss.eval_intersection(I, gt)
+        # 445 for SyntheticDataset
+        self.assertGreater(ninter, 420)
+        self.assertLess(ninter, 460)
+
 
 
 class TestPairwiseDis(unittest.TestCase):
@@ -529,3 +573,27 @@ class TestResultHeap(unittest.TestCase):
 
         np.testing.assert_equal(all_rh[1].D, all_rh[3].D)
         np.testing.assert_equal(all_rh[1].I, all_rh[3].I)
+
+
+class TestReconstructBatch(unittest.TestCase):
+
+    def test_indexflat(self):
+        index = faiss.IndexFlatL2(32)
+        x = faiss.randn((100, 32), 1234)
+        index.add(x)
+
+        subset = [4, 7, 45]
+        np.testing.assert_equal(x[subset], index.reconstruct_batch(subset))
+
+    def test_exception(self):
+        index = faiss.index_factory(32, "IVF2,Flat")
+        x = faiss.randn((100, 32), 1234)
+        index.train(x)
+        index.add(x)
+
+        # make sure it raises an exception even if it enters the openmp for
+        subset = np.zeros(1200, dtype=int)
+        self.assertRaises(
+            RuntimeError,
+            lambda : index.reconstruct_batch(subset),
+        )

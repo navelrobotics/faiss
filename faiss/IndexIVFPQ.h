@@ -134,13 +134,17 @@ struct IndexIVFPQ : IndexIVF {
             float* x) const;
 
     InvertedListScanner* get_InvertedListScanner(
-            bool store_pairs) const override;
+            bool store_pairs,
+            const IDSelector* sel) const override;
 
     /// build precomputed table
     void precompute_table();
 
     IndexIVFPQ();
 };
+
+// block size used in IndexIVFPQ::add_core_o
+FAISS_API extern int index_ivfpq_add_core_o_bs;
 
 /** Pre-compute distance tables for IVFPQ with by-residual and METRIC_L2
  *

@@ -125,7 +125,10 @@ void IndexBinaryIVF::search(
         const uint8_t* x,
         idx_t k,
         int32_t* distances,
-        idx_t* labels) const {
+        idx_t* labels,
+        const SearchParameters* params) const {
+    FAISS_THROW_IF_NOT_MSG(
+            !params, "search params not supported for this index");
     FAISS_THROW_IF_NOT(k > 0);
     FAISS_THROW_IF_NOT(nprobe > 0);
 
@@ -175,7 +178,10 @@ void IndexBinaryIVF::search_and_reconstruct(
         idx_t k,
         int32_t* distances,
         idx_t* labels,
-        uint8_t* recons) const {
+        uint8_t* recons,
+        const SearchParameters* params) const {
+    FAISS_THROW_IF_NOT_MSG(
+            !params, "search params not supported for this index");
     const size_t nprobe = std::min(nlist, this->nprobe);
     FAISS_THROW_IF_NOT(k > 0);
     FAISS_THROW_IF_NOT(nprobe > 0);
@@ -279,22 +285,28 @@ void IndexBinaryIVF::train(idx_t n, const uint8_t* x) {
     is_trained = true;
 }
 
-void IndexBinaryIVF::merge_from(IndexBinaryIVF& other, idx_t add_id) {
-    // minimal sanity checks
-    FAISS_THROW_IF_NOT(other.d == d);
-    FAISS_THROW_IF_NOT(other.nlist == nlist);
-    FAISS_THROW_IF_NOT(other.code_size == code_size);
+void IndexBinaryIVF::check_compatible_for_merge(
+        const IndexBinary& otherIndex) const {
+    auto other = dynamic_cast<const IndexBinaryIVF*>(&otherIndex);
+    FAISS_THROW_IF_NOT(other);
+    FAISS_THROW_IF_NOT(other->d == d);
+    FAISS_THROW_IF_NOT(other->nlist == nlist);
+    FAISS_THROW_IF_NOT(other->code_size == code_size);
     FAISS_THROW_IF_NOT_MSG(
-            direct_map.no() && other.direct_map.no(),
+            direct_map.no() && other->direct_map.no(),
             "direct map copy not implemented");
     FAISS_THROW_IF_NOT_MSG(
             typeid(*this) == typeid(other),
             "can only merge indexes of the same type");
+}
 
-    invlists->merge_from(other.invlists, add_id);
-
-    ntotal += other.ntotal;
-    other.ntotal = 0;
+void IndexBinaryIVF::merge_from(IndexBinary& otherIndex, idx_t add_id) {
+    // minimal sanity checks
+    check_compatible_for_merge(otherIndex);
+    auto other = static_cast<IndexBinaryIVF*>(&otherIndex);
+    invlists->merge_from(other->invlists, add_id);
+    ntotal += other->ntotal;
+    other->ntotal = 0;
 }
 
 void IndexBinaryIVF::replace_invlists(InvertedLists* il, bool own) {
@@ -650,7 +662,10 @@ void IndexBinaryIVF::range_search(
         idx_t n,
         const uint8_t* x,
         int radius,
-        RangeSearchResult* res) const {
+        RangeSearchResult* res,
+        const SearchParameters* params) const {
+    FAISS_THROW_IF_NOT_MSG(
+            !params, "search params not supported for this index");
     const size_t nprobe = std::min(nlist, this->nprobe);
     std::unique_ptr<idx_t[]> idx(new idx_t[n * nprobe]);
     std::unique_ptr<int32_t[]> coarse_dis(new int32_t[n * nprobe]);

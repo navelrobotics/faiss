@@ -44,6 +44,8 @@ outputs:
         - mkl >=2018  # [not win]
         - mkl >=2018,<2021  # [win]
     test:
+      requires:
+        - conda-build
       commands:
         - test -f $PREFIX/lib/libfaiss$SHLIB_EXT       # [not win]
         - test -f $PREFIX/lib/libfaiss_avx2$SHLIB_EXT  # [not win]
@@ -63,7 +65,8 @@ outputs:
         - make  # [not win]
       host:
         - python {{ python }}
-        - numpy =1.11
+        - numpy =1.16  # [not win]
+        - numpy =1.11  # [win]
         - {{ pin_subpackage('libfaiss', exact=True) }}
       run:
         - python {{ python }}
@@ -73,7 +76,8 @@ outputs:
       requires:
         - numpy
         - scipy
-        - pytorch
+        - pytorch  # [not osx]
+        - pytorch <1.12.0  # [osx]
       commands:
         - python -X faulthandler -m unittest discover -v -s tests -p "test_*"
         - python -X faulthandler -m unittest discover -v -s tests -p "torch_*"
