@@ -3,22 +3,13 @@ Date: Wed, 9 Feb 2022 01:38:34 +0100
 Subject: Fix floating point comparisons in unit tests
 
 ---
- tests/test_lowlevel_ivf.cpp | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ tests/test_lowlevel_ivf.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/tests/test_lowlevel_ivf.cpp b/tests/test_lowlevel_ivf.cpp
-index 8d5ccc9..3cb0b4e 100644
+index 44450fc..3cb0b4e 100644
 --- a/tests/test_lowlevel_ivf.cpp
 +++ b/tests/test_lowlevel_ivf.cpp
-@@ -199,7 +199,7 @@ void test_lowlevel_access(const char* index_key, MetricType metric) {
-                     float computed_D = scanner->distance_to_code(
-                             codes.data() + vno * il->code_size);
- 
--                    EXPECT_EQ(computed_D, D[jj]);
-+                    EXPECT_FLOAT_EQ(computed_D, D[jj]);
-                 }
-             }
-         }
 @@ -361,7 +361,7 @@ void test_lowlevel_access_binary(const char* index_key) {
                      float computed_D = scanner->distance_to_code(
                              xb.data() + vno * il->code_size);

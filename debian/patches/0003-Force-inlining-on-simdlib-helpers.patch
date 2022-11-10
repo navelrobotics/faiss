@@ -10,7 +10,7 @@ these calls only work if they are inlined by the compiler.
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/faiss/utils/simdlib_neon.h b/faiss/utils/simdlib_neon.h
-index a8f2b84..32fabef 100644
+index 737e948..c45091a 100644
 --- a/faiss/utils/simdlib_neon.h
 +++ b/faiss/utils/simdlib_neon.h
 @@ -120,7 +120,7 @@ static inline std::string bin(const S& simd) {

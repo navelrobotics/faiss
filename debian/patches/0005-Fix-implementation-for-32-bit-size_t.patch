@@ -10,10 +10,10 @@ Subject: Fix implementation for 32 bit size_t
  4 files changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
-index 10de493..74ca988 100644
+index 535d239..44c5bb3 100644
 --- a/faiss/index_factory.cpp
 +++ b/faiss/index_factory.cpp
-@@ -596,7 +596,7 @@ std::unique_ptr<Index> index_factory_sub(
+@@ -730,7 +730,7 @@ std::unique_ptr<Index> index_factory_sub(
      }
  
      if (verbose) {
@@ -23,10 +23,10 @@ index 10de493..74ca988 100644
                 parenthesis_indexes.size(),
                 d);
 diff --git a/faiss/invlists/DirectMap.cpp b/faiss/invlists/DirectMap.cpp
-index e4e5eb5..7ce3034 100644
+index 6cb5202..1a5c3a6 100644
 --- a/faiss/invlists/DirectMap.cpp
 +++ b/faiss/invlists/DirectMap.cpp
-@@ -198,7 +198,7 @@ size_t DirectMap::remove_ids(const IDSelector& sel, InvertedLists* invlists) {
+@@ -199,7 +199,7 @@ size_t DirectMap::remove_ids(const IDSelector& sel, InvertedLists* invlists) {
                              last_id,
                              ScopedCodes(invlists, list_no, last).get());
                      // update hash entry for last element
@@ -36,7 +36,7 @@ index e4e5eb5..7ce3034 100644
                  invlists->resize(list_no, last);
                  nremove++;
 diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
-index 445798b..934107b 100644
+index 5027c0e..8caded3 100644
 --- a/faiss/invlists/OnDiskInvertedLists.cpp
 +++ b/faiss/invlists/OnDiskInvertedLists.cpp
 @@ -11,6 +11,7 @@
@@ -47,7 +47,7 @@ index 445798b..934107b 100644
  #include <unordered_set>
  
  #include <sys/mman.h>
-@@ -324,7 +325,7 @@ void OnDiskInvertedLists::update_totsize(size_t new_size) {
+@@ -325,7 +326,7 @@ void OnDiskInvertedLists::update_totsize(size_t new_size) {
  
      FAISS_THROW_IF_NOT_FMT(
              err == 0,
@@ -56,7 +56,7 @@ index 445798b..934107b 100644
              filename.c_str(),
              totsize,
              strerror(errno));
-@@ -523,7 +524,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+@@ -524,7 +525,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
          it++;
      }
  
@@ -65,7 +65,7 @@ index 445798b..934107b 100644
  
      size_t end_prev = inf;
      if (it != slots.begin()) {
-@@ -532,7 +533,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+@@ -533,7 +534,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
          end_prev = prev->offset + prev->capacity;
      }
  

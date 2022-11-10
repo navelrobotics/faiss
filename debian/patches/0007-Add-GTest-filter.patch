@@ -7,10 +7,10 @@ Subject: Add GTest filter
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 5d8ae42..2e377a2 100644
+index af7f857..37eff1e 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -53,4 +53,4 @@ target_link_libraries(faiss_test PRIVATE
+@@ -59,4 +59,4 @@ target_link_libraries(faiss_test PRIVATE
  
  # Defines `gtest_discover_tests()`.
  include(GoogleTest)

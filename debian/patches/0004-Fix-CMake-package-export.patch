@@ -3,28 +3,14 @@ Date: Tue, 8 Feb 2022 11:53:12 +0100
 Subject: Fix CMake package export
 
 ---
- CMakeLists.txt       | 2 +-
  faiss/CMakeLists.txt | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 14109c3..f8055e3 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -7,7 +7,7 @@
- cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
- 
- project(faiss
--  VERSION 1.6.4
-+  VERSION 1.7.2
-   DESCRIPTION "A library for efficient similarity search and clustering of dense vectors."
-   HOMEPAGE_URL "https://github.com/facebookresearch/faiss"
-   LANGUAGES CXX)
 diff --git a/faiss/CMakeLists.txt b/faiss/CMakeLists.txt
-index 1fbc849..eb3331a 100644
+index fd3ddb3..80f74b4 100644
 --- a/faiss/CMakeLists.txt
 +++ b/faiss/CMakeLists.txt
-@@ -269,9 +269,9 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/faiss-config.cmake.in
+@@ -292,9 +292,9 @@ configure_file(${PROJECT_SOURCE_DIR}/cmake/faiss-config.cmake.in
  )
  install(FILES ${PROJECT_BINARY_DIR}/cmake/faiss-config.cmake
    ${PROJECT_BINARY_DIR}/cmake/faiss-config-version.cmake

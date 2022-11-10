@@ -7,7 +7,7 @@ Subject: Use SWIGWORDSIZE32 on 32 bit architectures
  1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/faiss/python/CMakeLists.txt b/faiss/python/CMakeLists.txt
-index e403065..a0952a8 100644
+index 0e1f4c2..dbfca72 100644
 --- a/faiss/python/CMakeLists.txt
 +++ b/faiss/python/CMakeLists.txt
 @@ -25,9 +25,15 @@ macro(configure_swigfaiss source)

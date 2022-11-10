@@ -4,11 +4,11 @@ Subject: Use system GTest
 
 ---
  CMakeLists.txt       |  1 +
- tests/CMakeLists.txt | 21 ++++++++++++++-------
- 2 files changed, 15 insertions(+), 7 deletions(-)
+ tests/CMakeLists.txt | 20 +++++++++++++-------
+ 2 files changed, 14 insertions(+), 7 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a7b1fc6..14109c3 100644
+index 7430aac..de761c5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -22,6 +22,7 @@ option(FAISS_OPT_LEVEL "" "generic")
@@ -20,23 +20,23 @@ index a7b1fc6..14109c3 100644
  if(FAISS_ENABLE_GPU)
    set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index b0bdfd0..5d8ae42 100644
+index d03a91c..af7f857 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -30,18 +30,25 @@ else()
+@@ -37,18 +37,24 @@ else()
    target_link_libraries(faiss_test PRIVATE faiss)
  endif()
  
 -include(FetchContent)
 -FetchContent_Declare(googletest
--  URL "https://github.com/google/googletest/archive/release-1.10.0.tar.gz")
+-  URL "https://github.com/google/googletest/archive/release-1.12.1.tar.gz")
 -set(BUILD_GMOCK CACHE BOOL OFF)
 -set(INSTALL_GTEST CACHE BOOL OFF)
 -FetchContent_MakeAvailable(googletest)
 +if(NOT FAISS_USE_SYSTEM_GTEST)
 +  include(FetchContent)
 +  FetchContent_Declare(googletest
-+    URL "https://github.com/google/googletest/archive/release-1.10.0.tar.gz")
++    URL "https://github.com/google/googletest/archive/release-1.12.1.tar.gz")
 +  set(BUILD_GMOCK CACHE BOOL OFF)
 +  set(INSTALL_GTEST CACHE BOOL OFF)
 +  FetchContent_MakeAvailable(googletest)
@@ -51,8 +51,7 @@ index b0bdfd0..5d8ae42 100644
  target_link_libraries(faiss_test PRIVATE
    OpenMP::OpenMP_CXX
 -  gtest_main
-+  ${GTEST_BOTH_LIBRARIES}
-+  pthread
++  GTest::gtest_main
  )
  
  # Defines `gtest_discover_tests()`.
