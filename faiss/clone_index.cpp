@@ -32,6 +32,11 @@
 #include <faiss/MetaIndexes.h>
 #include <faiss/VectorTransform.h>
 
+#include <faiss/impl/LocalSearchQuantizer.h>
+#include <faiss/impl/ProductQuantizer.h>
+#include <faiss/impl/ResidualQuantizer.h>
+#include <faiss/impl/ScalarQuantizer.h>
+
 namespace faiss {
 
 /*************************************************************
@@ -117,7 +122,9 @@ Index* Cloner::clone_Index(const Index* index) {
         return res;
     } else if (
             const IndexIDMap* idmap = dynamic_cast<const IndexIDMap*>(index)) {
-        IndexIDMap* res = new IndexIDMap(*idmap);
+        const IndexIDMap2* idmap2 = dynamic_cast<const IndexIDMap2*>(index);
+        IndexIDMap* res =
+                idmap2 ? new IndexIDMap2(*idmap2) : new IndexIDMap(*idmap);
         res->own_fields = true;
         res->index = clone_Index(idmap->index);
         return res;
@@ -138,6 +145,13 @@ Index* Cloner::clone_Index(const Index* index) {
         res->storage = clone_Index(insg->storage);
         return res;
     } else if (
+            const IndexNNDescent* innd =
+                    dynamic_cast<const IndexNNDescent*>(index)) {
+        IndexNNDescent* res = new IndexNNDescent(*innd);
+        res->own_fields = true;
+        res->storage = clone_Index(innd->storage);
+        return res;
+    } else if (
             const Index2Layer* i2l = dynamic_cast<const Index2Layer*>(index)) {
         Index2Layer* res = new Index2Layer(*i2l);
         res->q1.own_fields = true;
@@ -147,6 +161,14 @@ Index* Cloner::clone_Index(const Index* index) {
         FAISS_THROW_MSG("clone not supported for this type of Index");
     }
     return nullptr;
+}
+
+Quantizer* clone_Quantizer(const Quantizer* quant) {
+    TRYCLONE(ResidualQuantizer, quant)
+    TRYCLONE(LocalSearchQuantizer, quant)
+    TRYCLONE(ProductQuantizer, quant)
+    TRYCLONE(ScalarQuantizer, quant)
+    FAISS_THROW_MSG("Did not recognize quantizer to clone");
 }
 
 } // namespace faiss

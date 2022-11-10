@@ -5,21 +5,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-// -*- c++ -*-
-
 #include <faiss/impl/ResidualQuantizer.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 
-#include <faiss/impl/FaissAssert.h>
-#include <faiss/impl/ResidualQuantizer.h>
-#include <faiss/utils/utils.h>
-
-#include <faiss/Clustering.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/VectorTransform.h>
 #include <faiss/impl/AuxIndexStructures.h>
@@ -27,7 +21,6 @@
 #include <faiss/utils/Heap.h>
 #include <faiss/utils/distances.h>
 #include <faiss/utils/hamming.h>
-#include <faiss/utils/simdlib.h>
 #include <faiss/utils/utils.h>
 
 extern "C" {
@@ -47,15 +40,34 @@ int sgemm_(
         float* beta,
         float* c,
         FINTEGER* ldc);
+
+// http://www.netlib.org/clapack/old/single/sgels.c
+// solve least squares
+
+int sgelsd_(
+        FINTEGER* m,
+        FINTEGER* n,
+        FINTEGER* nrhs,
+        float* a,
+        FINTEGER* lda,
+        float* b,
+        FINTEGER* ldb,
+        float* s,
+        float* rcond,
+        FINTEGER* rank,
+        float* work,
+        FINTEGER* lwork,
+        FINTEGER* iwork,
+        FINTEGER* info);
 }
 
 namespace faiss {
 
 ResidualQuantizer::ResidualQuantizer()
         : train_type(Train_progressive_dim),
+          niter_codebook_refine(5),
           max_beam_size(5),
           use_beam_LUT(0),
-          max_mem_distances(5 * (size_t(1) << 30)), // 5 GiB
           assign_index_factory(nullptr) {
     d = 0;
     M = 0;
@@ -80,6 +92,39 @@ ResidualQuantizer::ResidualQuantizer(
         size_t nbits,
         Search_type_t search_type)
         : ResidualQuantizer(d, std::vector<size_t>(M, nbits), search_type) {}
+
+void ResidualQuantizer::initialize_from(
+        const ResidualQuantizer& other,
+        int skip_M) {
+    FAISS_THROW_IF_NOT(M + skip_M <= other.M);
+    FAISS_THROW_IF_NOT(skip_M >= 0);
+
+    Search_type_t this_search_type = search_type;
+    int this_M = M;
+
+    // a first good approximation: override everything
+    *this = other;
+
+    // adjust derived values
+    M = this_M;
+    search_type = this_search_type;
+    nbits.resize(M);
+    memcpy(nbits.data(),
+           other.nbits.data() + skip_M,
+           nbits.size() * sizeof(nbits[0]));
+
+    set_derived_values();
+
+    // resize codebooks if trained
+    if (codebooks.size() > 0) {
+        FAISS_THROW_IF_NOT(codebooks.size() == other.total_codebook_size * d);
+        codebooks.resize(total_codebook_size * d);
+        memcpy(codebooks.data(),
+               other.codebooks.data() + other.codebook_offsets[skip_M] * d,
+               codebooks.size() * sizeof(codebooks[0]));
+        // TODO: norm_tabs?
+    }
+}
 
 void beam_search_encode_step(
         size_t d,
@@ -245,8 +290,6 @@ void ResidualQuantizer::train(size_t n, const float* x) {
             }
             train_residuals = residuals1;
         }
-        train_type_t tt = train_type_t(train_type & 1023);
-
         std::vector<float> codebooks;
         float obj = 0;
 
@@ -259,7 +302,7 @@ void ResidualQuantizer::train(size_t n, const float* x) {
 
         double t1 = getmillisecs();
 
-        if (tt == Train_default) {
+        if (!(train_type & Train_progressive_dim)) { // regular kmeans
             Clustering clus(d, K, cp);
             clus.train(
                     train_residuals.size() / d,
@@ -268,7 +311,7 @@ void ResidualQuantizer::train(size_t n, const float* x) {
             codebooks.swap(clus.centroids);
             assign_index->reset();
             obj = clus.iteration_stats.back().obj;
-        } else if (tt == Train_progressive_dim) {
+        } else { // progressive dim clustering
             ProgressiveDimClustering clus(d, K, cp);
             ProgressiveDimIndexFactory default_fac;
             clus.train(
@@ -277,8 +320,6 @@ void ResidualQuantizer::train(size_t n, const float* x) {
                     assign_index_factory ? *assign_index_factory : default_fac);
             codebooks.swap(clus.centroids);
             obj = clus.iteration_stats.back().obj;
-        } else {
-            FAISS_THROW_MSG("train type not supported");
         }
         clustering_time += (getmillisecs() - t1) / 1000;
 
@@ -350,6 +391,19 @@ void ResidualQuantizer::train(size_t n, const float* x) {
         cur_beam_size = new_beam_size;
     }
 
+    is_trained = true;
+
+    if (train_type & Train_refine_codebook) {
+        for (int iter = 0; iter < niter_codebook_refine; iter++) {
+            if (verbose) {
+                printf("re-estimating the codebooks to minimize "
+                       "quantization errors (iter %d).\n",
+                       iter);
+            }
+            retrain_AQ_codebook(n, x);
+        }
+    }
+
     // find min and max norms
     std::vector<float> norms(n);
 
@@ -359,33 +413,128 @@ void ResidualQuantizer::train(size_t n, const float* x) {
     }
 
     // fvec_norms_L2sqr(norms.data(), x, d, n);
-
-    norm_min = HUGE_VALF;
-    norm_max = -HUGE_VALF;
-    for (idx_t i = 0; i < n; i++) {
-        if (norms[i] < norm_min) {
-            norm_min = norms[i];
-        }
-        if (norms[i] > norm_max) {
-            norm_max = norms[i];
-        }
-    }
-
-    if (search_type == ST_norm_cqint8 || search_type == ST_norm_cqint4) {
-        size_t k = (1 << 8);
-        if (search_type == ST_norm_cqint4) {
-            k = (1 << 4);
-        }
-        Clustering1D clus(k);
-        clus.train_exact(n, norms.data());
-        qnorm.add(clus.k, clus.centroids.data());
-    }
-
-    is_trained = true;
+    train_norm(n, norms.data());
 
     if (!(train_type & Skip_codebook_tables)) {
         compute_codebook_tables();
     }
+}
+
+float ResidualQuantizer::retrain_AQ_codebook(size_t n, const float* x) {
+    FAISS_THROW_IF_NOT_MSG(n >= total_codebook_size, "too few training points");
+
+    if (verbose) {
+        printf("  encoding %zd training vectors\n", n);
+    }
+    std::vector<uint8_t> codes(n * code_size);
+    compute_codes(x, codes.data(), n);
+
+    // compute reconstruction error
+    float input_recons_error;
+    {
+        std::vector<float> x_recons(n * d);
+        decode(codes.data(), x_recons.data(), n);
+        input_recons_error = fvec_L2sqr(x, x_recons.data(), n * d);
+        if (verbose) {
+            printf("  input quantization error %g\n", input_recons_error);
+        }
+    }
+
+    // build matrix of the linear system
+    std::vector<float> C(n * total_codebook_size);
+    for (size_t i = 0; i < n; i++) {
+        BitstringReader bsr(codes.data() + i * code_size, code_size);
+        for (int m = 0; m < M; m++) {
+            int idx = bsr.read(nbits[m]);
+            C[i + (codebook_offsets[m] + idx) * n] = 1;
+        }
+    }
+
+    // transpose training vectors
+    std::vector<float> xt(n * d);
+
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < d; j++) {
+            xt[j * n + i] = x[i * d + j];
+        }
+    }
+
+    { // solve least squares
+        FINTEGER lwork = -1;
+        FINTEGER di = d, ni = n, tcsi = total_codebook_size;
+        FINTEGER info = -1, rank = -1;
+
+        float rcond = 1e-4; // this is an important parameter because the code
+                            // matrix can be rank deficient for small problems,
+                            // the default rcond=-1 does not work
+        float worksize;
+        std::vector<float> sing_vals(total_codebook_size);
+        FINTEGER nlvl = 1000; // formula is a bit convoluted so let's take an
+                              // upper bound
+        std::vector<FINTEGER> iwork(
+                3 * total_codebook_size * nlvl + 11 * total_codebook_size);
+
+        // worksize query
+        sgelsd_(&ni,
+                &tcsi,
+                &di,
+                C.data(),
+                &ni,
+                xt.data(),
+                &ni,
+                sing_vals.data(),
+                &rcond,
+                &rank,
+                &worksize,
+                &lwork,
+                iwork.data(),
+                &info);
+        FAISS_THROW_IF_NOT(info == 0);
+
+        lwork = worksize;
+        std::vector<float> work(lwork);
+        // actual call
+        sgelsd_(&ni,
+                &tcsi,
+                &di,
+                C.data(),
+                &ni,
+                xt.data(),
+                &ni,
+                sing_vals.data(),
+                &rcond,
+                &rank,
+                work.data(),
+                &lwork,
+                iwork.data(),
+                &info);
+        FAISS_THROW_IF_NOT_FMT(info == 0, "SGELS returned info=%d", int(info));
+        if (verbose) {
+            printf("   sgelsd rank=%d/%d\n",
+                   int(rank),
+                   int(total_codebook_size));
+        }
+    }
+
+    // result is in xt, re-transpose to codebook
+
+    for (size_t i = 0; i < total_codebook_size; i++) {
+        for (size_t j = 0; j < d; j++) {
+            codebooks[i * d + j] = xt[j * n + i];
+            FAISS_THROW_IF_NOT(std::isfinite(codebooks[i * d + j]));
+        }
+    }
+
+    float output_recons_error = 0;
+    for (size_t j = 0; j < d; j++) {
+        output_recons_error += fvec_norm_L2sqr(
+                xt.data() + total_codebook_size + n * j,
+                n - total_codebook_size);
+    }
+    if (verbose) {
+        printf("  output quantization error %g\n", output_recons_error);
+    }
+    return output_recons_error;
 }
 
 size_t ResidualQuantizer::memory_per_point(int beam_size) const {
@@ -400,10 +549,11 @@ size_t ResidualQuantizer::memory_per_point(int beam_size) const {
     return mem;
 }
 
-void ResidualQuantizer::compute_codes(
+void ResidualQuantizer::compute_codes_add_centroids(
         const float* x,
         uint8_t* codes_out,
-        size_t n) const {
+        size_t n,
+        const float* centroids) const {
     FAISS_THROW_IF_NOT_MSG(is_trained, "RQ is not trained yet.");
 
     size_t mem = memory_per_point();
@@ -415,7 +565,12 @@ void ResidualQuantizer::compute_codes(
         }
         for (size_t i0 = 0; i0 < n; i0 += bs) {
             size_t i1 = std::min(n, i0 + bs);
-            compute_codes(x + i0 * d, codes_out + i0 * code_size, i1 - i0);
+            const float* cent = nullptr;
+            if (centroids != nullptr) {
+                cent = centroids + i0 * d;
+            }
+            compute_codes_add_centroids(
+                    x + i0 * d, codes_out + i0 * code_size, i1 - i0, cent);
         }
         return;
     }
@@ -489,7 +644,8 @@ void ResidualQuantizer::compute_codes(
             codes.data(),
             codes_out,
             M * max_beam_size,
-            norms.size() > 0 ? norms.data() : nullptr);
+            norms.size() > 0 ? norms.data() : nullptr,
+            centroids);
 }
 
 void ResidualQuantizer::refine_beam(

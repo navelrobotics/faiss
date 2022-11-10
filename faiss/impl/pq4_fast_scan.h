@@ -26,7 +26,7 @@ namespace faiss {
  *  The unused bytes are set to 0.
  *
  * @param codes   input codes, size (ntotal, ceil(M / 2))
- * @param nototal number of input codes
+ * @param ntotal  number of input codes
  * @param nb      output number of codes (ntotal rounded up to a multiple of
  *                bbs)
  * @param M2      number of sub-quantizers (=M rounded up to a muliple of 2)
@@ -61,14 +61,27 @@ void pq4_pack_codes_range(
 
 /** get a single element from a packed codes table
  *
- * @param i        vector id
+ * @param vector_id        vector id
  * @param sq       subquantizer (< nsq)
  */
 uint8_t pq4_get_packed_element(
         const uint8_t* data,
         size_t bbs,
         size_t nsq,
-        size_t i,
+        size_t vector_id,
+        size_t sq);
+
+/** set a single element "code" into a packed codes table
+ *
+ * @param vector_id       vector id
+ * @param sq       subquantizer (< nsq)
+ */
+void pq4_set_packed_element(
+        uint8_t* data,
+        uint8_t code,
+        size_t bbs,
+        size_t nsq,
+        size_t vector_id,
         size_t sq);
 
 /** Pack Look-up table for consumption by the kernel.
@@ -88,8 +101,9 @@ void pq4_pack_LUT(int nq, int nsq, const uint8_t* src, uint8_t* dest);
  * @param nsq     number of sub-quantizers (muliple of 2)
  * @param codes   packed codes array
  * @param LUT     packed look-up table
+ * @param scaler  scaler to scale the encoded norm
  */
-template <class ResultHandler>
+template <class ResultHandler, class Scaler>
 void pq4_accumulate_loop(
         int nq,
         size_t nb,
@@ -97,7 +111,8 @@ void pq4_accumulate_loop(
         int nsq,
         const uint8_t* codes,
         const uint8_t* LUT,
-        ResultHandler& res);
+        ResultHandler& res,
+        const Scaler& scaler);
 
 /* qbs versions, supported only for bbs=32.
  *
@@ -141,20 +156,22 @@ int pq4_pack_LUT_qbs_q_map(
 
 /** Run accumulation loop.
  *
- * @param qbs     4-bit encded number of queries
+ * @param qbs     4-bit encoded number of queries
  * @param nb      number of database codes (mutliple of bbs)
  * @param nsq     number of sub-quantizers
  * @param codes   encoded database vectors (packed)
  * @param LUT     look-up table (packed)
  * @param res     call-back for the resutls
+ * @param scaler  scaler to scale the encoded norm
  */
-template <class ResultHandler>
+template <class ResultHandler, class Scaler>
 void pq4_accumulate_loop_qbs(
         int qbs,
         size_t nb,
         int nsq,
         const uint8_t* codes,
         const uint8_t* LUT,
-        ResultHandler& res);
+        ResultHandler& res,
+        const Scaler& scaler);
 
 } // namespace faiss
