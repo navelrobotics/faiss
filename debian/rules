@@ -8,6 +8,7 @@ GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
+		-DPython_FIND_UNVERSIONED_NAMES=FIRST \
 		-DFAISS_ENABLE_GPU=OFF \
 		-DFAISS_ENABLE_PYTHON=ON \
 		-DFAISS_ENABLE_C_API=ON \
