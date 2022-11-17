@@ -2,11 +2,14 @@
 set -e
 
 cp -r tests "$AUTOPKGTEST_TMP"
+mkdir -p "$AUTOPKGTEST_TMP/include/faiss"
+cp -r faiss/cppcontrib "$AUTOPKGTEST_TMP/include/faiss"
 cd "$AUTOPKGTEST_TMP/tests"
 sed -i -e '1i \
 cmake_minimum_required(VERSION 3.17)\
 project(autopkgtest)\
-find_package(faiss REQUIRED)' CMakeLists.txt
+find_package(faiss REQUIRED)\
+include_directories(../include)' CMakeLists.txt
 set -x
 mkdir build
 cd build
