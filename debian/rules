@@ -1,6 +1,7 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
 BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
+GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*
 
 %:
 	dh $@ --buildsystem=cmake --builddirectory=build
@@ -11,7 +12,7 @@ override_dh_auto_configure:
 		-DFAISS_ENABLE_PYTHON=ON \
 		-DFAISS_ENABLE_C_API=ON \
 		-DFAISS_USE_SYSTEM_GTEST=ON \
-		-DFAISS_GTEST_FILTER="-MEM_LEAK.*" \
+		-DFAISS_GTEST_FILTER="$(GTEST_FILTER)" \
 		-DBUILD_TESTING=$(BUILD_TESTING)
 
 execute_after_dh_auto_install:
