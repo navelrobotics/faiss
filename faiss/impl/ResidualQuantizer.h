@@ -13,6 +13,8 @@
 #include <faiss/Clustering.h>
 #include <faiss/impl/AdditiveQuantizer.h>
 
+#include <faiss/utils/approx_topk/mode.h>
+
 namespace faiss {
 
 /** Residual quantizer with variable number of bits per sub-quantizer
@@ -29,7 +31,7 @@ struct ResidualQuantizer : AdditiveQuantizer {
     using train_type_t = int;
 
     /// Binary or of the Train_* flags below
-    train_type_t train_type;
+    train_type_t train_type = Train_progressive_dim;
 
     /// regular k-means (minimal amount of computation)
     static const int Train_default = 0;
@@ -41,7 +43,7 @@ struct ResidualQuantizer : AdditiveQuantizer {
     static const int Train_refine_codebook = 2;
 
     /// number of iterations for codebook refinement.
-    int niter_codebook_refine;
+    int niter_codebook_refine = 5;
 
     /** set this bit on train_type if beam is to be trained only on the
      *  first element of the beam (faster but less accurate) */
@@ -52,16 +54,20 @@ struct ResidualQuantizer : AdditiveQuantizer {
     static const int Skip_codebook_tables = 2048;
 
     /// beam size used for training and for encoding
-    int max_beam_size;
+    int max_beam_size = 5;
 
     /// use LUT for beam search
-    int use_beam_LUT;
+    int use_beam_LUT = 0;
+
+    /// Currently used mode of approximate min-k computations.
+    /// Default value is EXACT_TOPK.
+    ApproxTopK_mode_t approx_topk_mode = ApproxTopK_mode_t::EXACT_TOPK;
 
     /// clustering parameters
     ProgressiveDimClusteringParameters cp;
 
     /// if non-NULL, use this index for assignment
-    ProgressiveDimIndexFactory* assign_index_factory;
+    ProgressiveDimIndexFactory* assign_index_factory = nullptr;
 
     ResidualQuantizer(
             size_t d,
@@ -183,7 +189,8 @@ void beam_search_encode_step(
         int32_t* new_codes,
         float* new_residuals,
         float* new_distances,
-        Index* assign_index = nullptr);
+        Index* assign_index = nullptr,
+        ApproxTopK_mode_t approx_topk = ApproxTopK_mode_t::EXACT_TOPK);
 
 /** Encode a set of vectors using their dot products with the codebooks
  *
@@ -202,7 +209,8 @@ void beam_search_encode_step_tab(
         const int32_t* codes,   // n * beam_size * m
         const float* distances, // n * beam_size
         size_t new_beam_size,
-        int32_t* new_codes,    // n * new_beam_size * (m + 1)
-        float* new_distances); // n * new_beam_size
+        int32_t* new_codes,   // n * new_beam_size * (m + 1)
+        float* new_distances, // n * new_beam_size
+        ApproxTopK_mode_t approx_topk = ApproxTopK_mode_t::EXACT_TOPK);
 
 }; // namespace faiss

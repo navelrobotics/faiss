@@ -21,7 +21,8 @@ from faiss.gpu_wrappers import *
 from faiss.array_conversions import *
 from faiss.extra_wrappers import kmin, kmax, pairwise_distances, rand, randint, \
     lrand, randn, rand_smooth_vectors, eval_intersection, normalize_L2, \
-    ResultHeap, knn, Kmeans
+    ResultHeap, knn, Kmeans, checksum, matrix_bucket_sort_inplace, bucket_sort, \
+    merge_knn_results
 
 
 __version__ = "%d.%d.%d" % (FAISS_VERSION_MAJOR,
@@ -67,6 +68,9 @@ for symbol in dir(this_module):
 
         if issubclass(the_class, SearchParameters):
             class_wrappers.handle_SearchParameters(the_class)
+
+        if issubclass(the_class, CodePacker):
+            class_wrappers.handle_CodePacker(the_class)
 
 ##############################################################################
 # For some classes (IndexIVF, IDSelector), the object holds a reference to
@@ -185,6 +189,9 @@ add_ref_in_constructor(BufferedIOWriter, 0)
 add_ref_in_constructor(BufferedIOReader, 0)
 
 add_ref_in_constructor(IDSelectorNot, 0)
+add_ref_in_constructor(IDSelectorAnd, slice(2))
+add_ref_in_constructor(IDSelectorOr, slice(2))
+add_ref_in_constructor(IDSelectorXOr, slice(2))
 
 # seems really marginal...
 # remove_ref_from_method(IndexReplicas, 'removeIndex', 0)

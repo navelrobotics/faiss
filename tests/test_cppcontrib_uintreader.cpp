@@ -1,3 +1,10 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 // This test was designed to be run using valgrind or ASAN to test the
 // correctness of memory accesses.
 
@@ -96,6 +103,10 @@ TEST(TEST_CPPCONTRIB_UINTREADER, Test8bit) {
 
 TEST(TEST_CPPCONTRIB_UINTREADER, Test10bit) {
     TestUintReaderBits<10>();
+}
+
+TEST(TEST_CPPCONTRIB_UINTREADER, Test12bit) {
+    TestUintReaderBits<12>();
 }
 
 TEST(TEST_CPPCONTRIB_UINTREADER, Test16bit) {

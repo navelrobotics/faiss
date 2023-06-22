@@ -50,7 +50,6 @@ int sgemm_(
 
 namespace faiss {
 
-using idx_t = Index::idx_t;
 using storage_idx_t = NNDescent::storage_idx_t;
 
 /**************************************************************
@@ -89,7 +88,7 @@ struct NegativeDistanceComputer : DistanceComputer {
 };
 
 DistanceComputer* storage_distance_computer(const Index* storage) {
-    if (storage->metric_type == METRIC_INNER_PRODUCT) {
+    if (is_similarity_metric(storage->metric_type)) {
         return new NegativeDistanceComputer(storage->get_distance_computer());
     } else {
         return storage->get_distance_computer();

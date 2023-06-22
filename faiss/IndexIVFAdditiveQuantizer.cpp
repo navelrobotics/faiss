@@ -51,7 +51,7 @@ void IndexIVFAdditiveQuantizer::train_residual(idx_t n, const float* x) {
     ScopeDeleter<float> del_x(x_in == x ? nullptr : x);
 
     if (by_residual) {
-        std::vector<Index::idx_t> idx(n);
+        std::vector<idx_t> idx(n);
         quantizer->assign(n, x, idx.data());
 
         std::vector<float> residuals(n * d);
@@ -145,7 +145,7 @@ struct AQInvertedListScanner : InvertedListScanner {
             : ia(ia), aq(*ia.aq) {
         this->store_pairs = store_pairs;
         this->code_size = ia.code_size;
-        keep_max = ia.metric_type == METRIC_INNER_PRODUCT;
+        keep_max = is_similarity_metric(ia.metric_type);
         tmp.resize(ia.d);
     }
 

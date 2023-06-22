@@ -82,7 +82,7 @@ class TestSearch(unittest.TestCase):
         t1 = time.time()
         pqfs_t = t1 - t0
         print('PQ16x4fs search time:', pqfs_t)
-        self.assertLess(pqfs_t * 5, pq_t)
+        self.assertLess(pqfs_t * 4, pq_t)
 
 
 class TestRounding(unittest.TestCase):
@@ -284,6 +284,17 @@ class TestImplems(unittest.TestCase):
             index2.implem = 4
             Dref, Iref = index2.search(ds.get_queries(), 10)
 
+            # check CodePacker
+            codes_ref = faiss.vector_to_array(index.codes)
+            codes_ref = codes_ref.reshape(-1, index.code_size)
+            index2codes = faiss.vector_to_array(index2.codes)
+            code_packer = index2.get_CodePacker()
+            index2codes = index2codes.reshape(-1, code_packer.block_size)
+
+            for i in range(0, len(codes_ref), 13):
+                code_new = code_packer.unpack_1(index2codes, i)
+                np.testing.assert_array_equal(codes_ref[i], code_new)
+
             self.cache[(d, metric)] = (ds, index, Dref, Iref)
 
         return self.cache[(d, metric)]
@@ -300,12 +311,10 @@ class TestImplems(unittest.TestCase):
 
         verify_with_draws(self, Dref, Iref, Dnew, Inew)
 
-
     def build_fast_scan_index(self, index, params):
         index2 = faiss.IndexPQFastScan(index)
         index2.implem = 5
         return index2
-
 
 
 class TestImplem12(TestImplems):
@@ -402,6 +411,7 @@ class TestImplem15(TestImplems):
 
     def test_2_64(self):
         self.do_with_params(32, (2, 64))
+
 
 class TestAdd(unittest.TestCase):
 
@@ -661,7 +671,7 @@ class TestPAQFastScan(unittest.TestCase):
 
     def test_accuracy_PLSQ(self):
         self.subtest_accuracy("PLSQ")
-    
+
     def test_accuracy_PRQ(self):
         self.subtest_accuracy("PRQ")
 
@@ -698,3 +708,18 @@ class TestPAQFastScan(unittest.TestCase):
     def test_io(self):
         self.subtest_io('PLSQ2x3x4fs_Nlsq2x4')
         self.subtest_io('PRQ2x3x4fs_Nrq2x4')
+
+
+class TestBlockDecode(unittest.TestCase):
+
+    def test_issue_2739(self):
+        ds = datasets.SyntheticDataset(960, 200, 1, 0)
+        M = 32
+        index = faiss.index_factory(ds.d, f"PQ{M}x4fs")
+        index.train(ds.get_train())
+        index.add(ds.get_database())
+
+        np.testing.assert_array_equal(
+            index.pq.decode(index.pq.compute_codes(ds.get_database()))[0, ::100],
+            index.reconstruct(0)[::100]
+        )

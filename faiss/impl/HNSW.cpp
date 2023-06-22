@@ -47,11 +47,6 @@ void HNSW::neighbor_range(idx_t no, int layer_no, size_t* begin, size_t* end)
 
 HNSW::HNSW(int M) : rng(12345) {
     set_default_probas(M, 1.0 / log(M));
-    max_level = -1;
-    entry_point = -1;
-    efSearch = 16;
-    efConstruction = 40;
-    upper_beam = 1;
     offsets.push_back(0);
 }
 
@@ -509,7 +504,6 @@ void HNSW::add_with_locks(
 
 namespace {
 
-using idx_t = HNSW::idx_t;
 using MinimaxHeap = HNSW::MinimaxHeap;
 using Node = HNSW::Node;
 /** Do a BFS on the candidates list */
@@ -837,8 +831,10 @@ void HNSW::MinimaxHeap::push(storage_idx_t i, float v) {
     if (k == n) {
         if (v >= dis[0])
             return;
+        if (ids[0] != -1) {
+            --nvalid;
+        }
         faiss::heap_pop<HC>(k--, dis.data(), ids.data());
-        --nvalid;
     }
     faiss::heap_push<HC>(++k, dis.data(), ids.data(), v, i);
     ++nvalid;

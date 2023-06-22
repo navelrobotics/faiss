@@ -26,6 +26,8 @@
 #include <faiss/impl/IDSelector.h>
 #include <faiss/impl/ResultHandler.h>
 
+#include <faiss/utils/distances_fused/distances_fused.h>
+
 #ifndef FINTEGER
 #define FINTEGER long
 #endif
@@ -229,7 +231,7 @@ void exhaustive_inner_product_blas(
 // distance correction is an operator that can be applied to transform
 // the distances
 template <class ResultHandler>
-void exhaustive_L2sqr_blas(
+void exhaustive_L2sqr_blas_default_impl(
         const float* x,
         const float* y,
         size_t d,
@@ -311,10 +313,20 @@ void exhaustive_L2sqr_blas(
     }
 }
 
+template <class ResultHandler>
+void exhaustive_L2sqr_blas(
+        const float* x,
+        const float* y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        ResultHandler& res,
+        const float* y_norms = nullptr) {
+    exhaustive_L2sqr_blas_default_impl(x, y, d, nx, ny, res);
+}
+
 #ifdef __AVX2__
-// an override for AVX2 if only a single closest point is needed.
-template <>
-void exhaustive_L2sqr_blas<SingleBestResultHandler<CMax<float, int64_t>>>(
+void exhaustive_L2sqr_blas_cmax_avx2(
         const float* x,
         const float* y,
         size_t d,
@@ -513,10 +525,52 @@ void exhaustive_L2sqr_blas<SingleBestResultHandler<CMax<float, int64_t>>>(
                 res.add_result(i, current_min_distance, current_min_index);
             }
         }
+        // Does nothing for SingleBestResultHandler, but
+        // keeping the call for the consistency.
+        res.end_multiple();
         InterruptCallback::check();
     }
 }
 #endif
+
+// an override if only a single closest point is needed
+template <>
+void exhaustive_L2sqr_blas<SingleBestResultHandler<CMax<float, int64_t>>>(
+        const float* x,
+        const float* y,
+        size_t d,
+        size_t nx,
+        size_t ny,
+        SingleBestResultHandler<CMax<float, int64_t>>& res,
+        const float* y_norms) {
+#if defined(__AVX2__)
+    // use a faster fused kernel if available
+    if (exhaustive_L2sqr_fused_cmax(x, y, d, nx, ny, res, y_norms)) {
+        // the kernel is available and it is complete, we're done.
+        return;
+    }
+
+    // run the specialized AVX2 implementation
+    exhaustive_L2sqr_blas_cmax_avx2(x, y, d, nx, ny, res, y_norms);
+
+#elif defined(__aarch64__)
+    // use a faster fused kernel if available
+    if (exhaustive_L2sqr_fused_cmax(x, y, d, nx, ny, res, y_norms)) {
+        // the kernel is available and it is complete, we're done.
+        return;
+    }
+
+    // run the default implementation
+    exhaustive_L2sqr_blas_default_impl<
+            SingleBestResultHandler<CMax<float, int64_t>>>(
+            x, y, d, nx, ny, res, y_norms);
+#else
+    // run the default implementation
+    exhaustive_L2sqr_blas_default_impl<
+            SingleBestResultHandler<CMax<float, int64_t>>>(
+            x, y, d, nx, ny, res, y_norms);
+#endif
+}
 
 template <class ResultHandler>
 void knn_L2sqr_select(
@@ -770,7 +824,7 @@ void pairwise_indexed_L2sqr(
         const float* y,
         const int64_t* iy,
         float* dis) {
-#pragma omp parallel for
+#pragma omp parallel for if (n > 1)
     for (int64_t j = 0; j < n; j++) {
         if (ix[j] >= 0 && iy[j] >= 0) {
             dis[j] = fvec_L2sqr(x + d * ix[j], y + d * iy[j], d);
@@ -786,7 +840,7 @@ void pairwise_indexed_inner_product(
         const float* y,
         const int64_t* iy,
         float* dis) {
-#pragma omp parallel for
+#pragma omp parallel for if (n > 1)
     for (int64_t j = 0; j < n; j++) {
         if (ix[j] >= 0 && iy[j] >= 0) {
             dis[j] = fvec_inner_product(x + d * ix[j], y + d * iy[j], d);
@@ -887,7 +941,7 @@ void pairwise_L2sqr(
     // store in beginning of distance matrix to avoid malloc
     float* b_norms = dis;
 
-#pragma omp parallel for
+#pragma omp parallel for if (nb > 1)
     for (int64_t i = 0; i < nb; i++)
         b_norms[i] = fvec_norm_L2sqr(xb + i * ldb, d);
 

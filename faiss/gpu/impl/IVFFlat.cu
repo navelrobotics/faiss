@@ -31,7 +31,7 @@ namespace gpu {
 IVFFlat::IVFFlat(
         GpuResources* res,
         int dim,
-        int nlist,
+        idx_t nlist,
         faiss::MetricType metric,
         float metricArg,
         bool useResidual,
@@ -52,19 +52,19 @@ IVFFlat::IVFFlat(
 
 IVFFlat::~IVFFlat() {}
 
-size_t IVFFlat::getGpuVectorsEncodingSize_(int numVecs) const {
+size_t IVFFlat::getGpuVectorsEncodingSize_(idx_t numVecs) const {
     if (interleavedLayout_) {
         // bits per scalar code
-        int bits = scalarQ_ ? scalarQ_->bits : 32 /* float */;
+        idx_t bits = scalarQ_ ? scalarQ_->bits : 32 /* float */;
 
         // bytes to encode a block of 32 vectors (single dimension)
-        int bytesPerDimBlock = bits * 32 / 8;
+        idx_t bytesPerDimBlock = bits * 32 / 8;
 
         // bytes to fully encode 32 vectors
-        int bytesPerBlock = bytesPerDimBlock * dim_;
+        idx_t bytesPerBlock = bytesPerDimBlock * dim_;
 
         // number of blocks of 32 vectors we have
-        int numBlocks = utils::divUp(numVecs, 32);
+        idx_t numBlocks = utils::divUp(numVecs, 32);
 
         // total size to encode numVecs
         return bytesPerBlock * numBlocks;
@@ -76,7 +76,7 @@ size_t IVFFlat::getGpuVectorsEncodingSize_(int numVecs) const {
     }
 }
 
-size_t IVFFlat::getCpuVectorsEncodingSize_(int numVecs) const {
+size_t IVFFlat::getCpuVectorsEncodingSize_(idx_t numVecs) const {
     size_t sizePerVector =
             (scalarQ_ ? scalarQ_->code_size : sizeof(float) * dim_);
 
@@ -85,7 +85,7 @@ size_t IVFFlat::getCpuVectorsEncodingSize_(int numVecs) const {
 
 std::vector<uint8_t> IVFFlat::translateCodesToGpu_(
         std::vector<uint8_t> codes,
-        size_t numVecs) const {
+        idx_t numVecs) const {
     if (!interleavedLayout_) {
         // same format
         return codes;
@@ -100,7 +100,7 @@ std::vector<uint8_t> IVFFlat::translateCodesToGpu_(
 
 std::vector<uint8_t> IVFFlat::translateCodesFromGpu_(
         std::vector<uint8_t> codes,
-        size_t numVecs) const {
+        idx_t numVecs) const {
     if (!interleavedLayout_) {
         // same format
         return codes;
@@ -115,13 +115,13 @@ std::vector<uint8_t> IVFFlat::translateCodesFromGpu_(
 void IVFFlat::appendVectors_(
         Tensor<float, 2, true>& vecs,
         Tensor<float, 2, true>& ivfCentroidResiduals,
-        Tensor<Index::idx_t, 1, true>& indices,
-        Tensor<Index::idx_t, 1, true>& uniqueLists,
-        Tensor<int, 1, true>& vectorsByUniqueList,
-        Tensor<int, 1, true>& uniqueListVectorStart,
-        Tensor<int, 1, true>& uniqueListStartOffset,
-        Tensor<Index::idx_t, 1, true>& listIds,
-        Tensor<int, 1, true>& listOffset,
+        Tensor<idx_t, 1, true>& indices,
+        Tensor<idx_t, 1, true>& uniqueLists,
+        Tensor<idx_t, 1, true>& vectorsByUniqueList,
+        Tensor<idx_t, 1, true>& uniqueListVectorStart,
+        Tensor<idx_t, 1, true>& uniqueListStartOffset,
+        Tensor<idx_t, 1, true>& listIds,
+        Tensor<idx_t, 1, true>& listOffset,
         cudaStream_t stream) {
     //
     // Append the new encodings
@@ -167,13 +167,13 @@ void IVFFlat::search(
         int nprobe,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<Index::idx_t, 2, true>& outIndices) {
+        Tensor<idx_t, 2, true>& outIndices) {
     auto stream = resources_->getDefaultStreamCurrentDevice();
 
     // These are caught at a higher level
     FAISS_ASSERT(nprobe <= GPU_MAX_SELECTION_K);
     FAISS_ASSERT(k <= GPU_MAX_SELECTION_K);
-    nprobe = std::min(nprobe, (int)getNumLists());
+    nprobe = int(std::min(idx_t(nprobe), getNumLists()));
 
     FAISS_ASSERT(queries.getSize(1) == dim_);
 
@@ -185,7 +185,7 @@ void IVFFlat::search(
             resources_,
             makeTempAlloc(AllocType::Other, stream),
             {queries.getSize(0), nprobe});
-    DeviceTensor<Index::idx_t, 2, true> coarseIndices(
+    DeviceTensor<idx_t, 2, true> coarseIndices(
             resources_,
             makeTempAlloc(AllocType::Other, stream),
             {queries.getSize(0), nprobe});
@@ -223,10 +223,10 @@ void IVFFlat::searchPreassigned(
         Index* coarseQuantizer,
         Tensor<float, 2, true>& vecs,
         Tensor<float, 2, true>& ivfDistances,
-        Tensor<Index::idx_t, 2, true>& ivfAssignments,
+        Tensor<idx_t, 2, true>& ivfAssignments,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<Index::idx_t, 2, true>& outIndices,
+        Tensor<idx_t, 2, true>& outIndices,
         bool storePairs) {
     FAISS_ASSERT(ivfDistances.getSize(0) == vecs.getSize(0));
     FAISS_ASSERT(ivfAssignments.getSize(0) == vecs.getSize(0));
@@ -286,11 +286,11 @@ void IVFFlat::searchPreassigned(
 void IVFFlat::searchImpl_(
         Tensor<float, 2, true>& queries,
         Tensor<float, 2, true>& coarseDistances,
-        Tensor<Index::idx_t, 2, true>& coarseIndices,
+        Tensor<idx_t, 2, true>& coarseIndices,
         Tensor<float, 3, true>& ivfCentroids,
         int k,
         Tensor<float, 2, true>& outDistances,
-        Tensor<Index::idx_t, 2, true>& outIndices,
+        Tensor<idx_t, 2, true>& outIndices,
         bool storePairs) {
     FAISS_ASSERT(storePairs == false);
 
@@ -336,7 +336,7 @@ void IVFFlat::searchImpl_(
     // FIXME: we might ultimately be calling this function with inputs
     // from the CPU, these are unnecessary copies
     if (indicesOptions_ == INDICES_CPU) {
-        HostTensor<Index::idx_t, 2, true> hostOutIndices(outIndices, stream);
+        HostTensor<idx_t, 2, true> hostOutIndices(outIndices, stream);
 
         ivfOffsetToUserIndex(
                 hostOutIndices.data(),

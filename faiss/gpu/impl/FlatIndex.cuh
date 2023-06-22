@@ -30,7 +30,7 @@ class FlatIndex {
     bool getUseFloat16() const;
 
     /// Returns the number of vectors we contain
-    int getSize() const;
+    idx_t getSize() const;
 
     /// Returns the dimensionality of the vectors
     int getDim() const;
@@ -50,7 +50,7 @@ class FlatIndex {
             faiss::MetricType metric,
             float metricArg,
             Tensor<float, 2, true>& outDistances,
-            Tensor<int, 2, true>& outIndices,
+            Tensor<idx_t, 2, true>& outIndices,
             bool exactDistance);
 
     void query(
@@ -59,29 +59,24 @@ class FlatIndex {
             faiss::MetricType metric,
             float metricArg,
             Tensor<float, 2, true>& outDistances,
-            Tensor<int, 2, true>& outIndices,
+            Tensor<idx_t, 2, true>& outIndices,
             bool exactDistance);
 
     /// Compute residual for set of vectors
     void computeResidual(
             Tensor<float, 2, true>& vecs,
-            Tensor<Index::idx_t, 1, true>& ids,
+            Tensor<idx_t, 1, true>& ids,
             Tensor<float, 2, true>& residuals);
 
     /// Gather vectors given the set of IDs
-    void reconstruct(
-            Tensor<Index::idx_t, 1, true>& ids,
-            Tensor<float, 2, true>& vecs);
+    void reconstruct(Tensor<idx_t, 1, true>& ids, Tensor<float, 2, true>& vecs);
 
     /// Gather vectors given a range of IDs
-    void reconstruct(
-            Index::idx_t start,
-            Index::idx_t num,
-            Tensor<float, 2, true>& vecs);
+    void reconstruct(idx_t start, idx_t num, Tensor<float, 2, true>& vecs);
 
     /// Add vectors to ourselves; the pointer passed can be on the host
     /// or the device
-    void add(const float* data, int numVecs, cudaStream_t stream);
+    void add(const float* data, idx_t numVecs, cudaStream_t stream);
 
     /// Free all storage
     void reset();
@@ -100,7 +95,7 @@ class FlatIndex {
     MemorySpace space_;
 
     /// How many vectors we have
-    int num_;
+    idx_t num_;
 
     /// The underlying expandable storage for float32 data
     DeviceVector<char> rawData32_;

@@ -7,6 +7,8 @@ import faiss
 import unittest
 import numpy as np
 import platform
+import os
+import random
 
 from faiss.contrib import datasets
 from faiss.contrib import inspect_tools
@@ -19,13 +21,11 @@ try:
     from faiss.contrib.exhaustive_search import \
         knn_ground_truth, knn, range_ground_truth, \
         range_search_max_results, exponential_query_iterator
-
 except:
     pass  # Submodule import broken in python 2.
 
 
-
-@unittest.skipIf(platform.python_version_tuple()[0] < '3', \
+@unittest.skipIf(platform.python_version_tuple()[0] < '3',
                  'Submodule import broken in python 2.')
 class TestComputeGT(unittest.TestCase):
 
@@ -43,7 +43,8 @@ class TestComputeGT(unittest.TestCase):
             for i0 in range(0, xb.shape[0], bs):
                 yield xb[i0:i0 + bs]
 
-        Dnew, Inew = knn_ground_truth(xq, matrix_iterator(xb, 1000), 10, metric)
+        Dnew, Inew = knn_ground_truth(
+            xq, matrix_iterator(xb, 1000), 10, metric)
 
         np.testing.assert_array_equal(Iref, Inew)
         # decimal = 4 required when run on GPU
@@ -103,7 +104,6 @@ class TestExhaustiveSearch(unittest.TestCase):
 
         assert np.all(Inew == Iref)
         assert np.allclose(Dref, Dnew)
-
 
         index = faiss.IndexFlatIP(32)
         index.add(xb)
@@ -311,14 +311,16 @@ class TestPreassigned(unittest.TestCase):
         a = alt_quantizer.search(xb[:, :20].copy(), 1)[1].ravel()
         ivf_tools.add_preassigned(index, xb, a)
 
-        # search elements xq, increase nprobe, check 4 first results w/ groundtruth
+        # search elements xq, increase nprobe, check 4 first results w/
+        # groundtruth
         prev_inter_perf = 0
         for nprobe in 1, 10, 20:
 
             index.nprobe = nprobe
             a = alt_quantizer.search(xq[:, :20].copy(), index.nprobe)[1]
             D, I = ivf_tools.search_preassigned(index, xq, 4, a)
-            inter_perf = faiss.eval_intersection(I, ds.get_groundtruth()[:, :4])
+            inter_perf = faiss.eval_intersection(
+                I, ds.get_groundtruth()[:, :4])
             self.assertTrue(inter_perf >= prev_inter_perf)
             prev_inter_perf = inter_perf
 
@@ -334,7 +336,8 @@ class TestPreassigned(unittest.TestCase):
 
         lims, DR, IR = ivf_tools.range_search_preassigned(index, xq, radius, a)
 
-        # with that radius the k-NN results are a subset of the range search results
+        # with that radius the k-NN results are a subset of the range search
+        # results
         for q in range(len(xq)):
             l0, l1 = lims[q], lims[q + 1]
             self.assertTrue(set(I[q]) <= set(IR[l0:l1]))
@@ -347,7 +350,8 @@ class TestPreassigned(unittest.TestCase):
         xq = ds.get_queries()
         xb = ds.get_database()
 
-        # define alternative quantizer on the 20 first dims of vectors (will be in float)
+        # define alternative quantizer on the 20 first dims of vectors
+        # (will be in float)
         km = faiss.Kmeans(20, 50)
         km.train(xt[:, :20].copy())
         alt_quantizer = km.index
@@ -374,7 +378,8 @@ class TestPreassigned(unittest.TestCase):
         ib.add(xb_bin)
         Dgt, Igt = ib.search(xq_bin, k)
 
-        # search elements xq, increase nprobe, check 4 first results w/ groundtruth
+        # search elements xq, increase nprobe, check 4 first results w/
+        # groundtruth
         prev_inter_perf = 0
         for nprobe in 1, 10, 20:
 
@@ -395,9 +400,11 @@ class TestPreassigned(unittest.TestCase):
         D, I = ivf_tools.search_preassigned(index, xq_bin, 4, a)
         radius = int(D.max() + 1)
 
-        lims, DR, IR = ivf_tools.range_search_preassigned(index, xq_bin, radius, a)
+        lims, DR, IR = ivf_tools.range_search_preassigned(
+            index, xq_bin, radius, a)
 
-        # with that radius the k-NN results are a subset of the range search results
+        # with that radius the k-NN results are a subset of the range
+        # search results
         for q in range(len(xq)):
             l0, l1 = lims[q], lims[q + 1]
             self.assertTrue(set(I[q]) <= set(IR[l0:l1]))
@@ -417,13 +424,14 @@ class TestRangeSearchMaxResults(unittest.TestCase):
         # baseline = search with that radius
         lims_ref, Dref, Iref = index.range_search(ds.get_queries(), radius0)
 
-        # now see if using just the total number of results, we can get back the same
-        # result table
+        # now see if using just the total number of results, we can get back
+        # the same result table
         query_iterator = exponential_query_iterator(ds.get_queries())
 
         init_radius = 1e10 if metric_type == faiss.METRIC_L2 else -1e10
         radius1, lims_new, Dnew, Inew = range_search_max_results(
-            index, query_iterator, init_radius, min_results=Dref.size, clip_to_min=True
+            index, query_iterator, init_radius,
+            min_results=Dref.size, clip_to_min=True
         )
 
         evaluation.test_ref_range_results(
@@ -448,7 +456,7 @@ class TestClustering(unittest.TestCase):
         km_ref.train(xt)
         err = faiss.knn(xt, km_ref.centroids, 1)[0].sum()
 
-        centroids2, _ = clustering.two_level_clustering(xt, 10, 10)
+        centroids2, _ = clustering.two_level_clustering(xt, 10, 100)
         err2 = faiss.knn(xt, centroids2, 1)[0].sum()
 
         self.assertLess(err2, err * 1.1)
@@ -464,10 +472,85 @@ class TestClustering(unittest.TestCase):
 
         index = faiss.index_factory(ds.d, "PCA16,IVF100,SQ8")
         faiss.extract_index_ivf(index).nprobe = 10
-        clustering.train_ivf_index_with_2level(index, ds.get_train(), verbose=True)
+        clustering.train_ivf_index_with_2level(
+            index, ds.get_train(), verbose=True, rebalance=False)
         index.add(ds.get_database())
         Dnew, Inew = index.search(ds.get_queries(), 1)
 
         # normally 47 / 200 differences
         ndiff = (Iref != Inew).sum()
         self.assertLess(ndiff, 50)
+
+
+class TestBigBatchSearch(unittest.TestCase):
+
+    def do_test(self, factory_string, metric=faiss.METRIC_L2):
+        # ds = datasets.SyntheticDataset(32, 2000, 4000, 1000)
+        ds = datasets.SyntheticDataset(32, 2000, 400, 500)
+        k = 10
+        index = faiss.index_factory(ds.d, factory_string, metric)
+        assert index.metric_type == metric
+        index.train(ds.get_train())
+        index.add(ds.get_database())
+        index.nprobe = 5
+        Dref, Iref = index.search(ds.get_queries(), k)
+        # faiss.omp_set_num_threads(1)
+        for method in ("pairwise_distances", "knn_function", "index"):
+            for threaded in 0, 1, 3, 8:
+                Dnew, Inew = ivf_tools.big_batch_search(
+                    index, ds.get_queries(),
+                    k, method=method,
+                    threaded=threaded
+                )
+                self.assertLess((Inew != Iref).sum() / Iref.size, 1e-4)
+                np.testing.assert_almost_equal(Dnew, Dref, decimal=4)
+
+    def test_Flat(self):
+        self.do_test("IVF64,Flat")
+
+    def test_Flat_IP(self):
+        self.do_test("IVF64,Flat", metric=faiss.METRIC_INNER_PRODUCT)
+
+    def test_PQ(self):
+        self.do_test("IVF64,PQ4np")
+
+    def test_SQ(self):
+        self.do_test("IVF64,SQ8")
+
+    def test_checkpoint(self):
+        ds = datasets.SyntheticDataset(32, 2000, 400, 500)
+        k = 10
+        index = faiss.index_factory(ds.d, "IVF64,SQ8")
+        index.train(ds.get_train())
+        index.add(ds.get_database())
+        index.nprobe = 5
+        Dref, Iref = index.search(ds.get_queries(), k)
+
+        r = random.randrange(1<<60)
+        checkpoint = "/tmp/test_big_batch_checkpoint.%d" % r
+        try:
+            # First big batch search
+            try:
+                Dnew, Inew = ivf_tools.big_batch_search(
+                    index, ds.get_queries(),
+                    k, method="knn_function",
+                    threaded=4,
+                    checkpoint=checkpoint, checkpoint_freq=4,
+                    crash_at=20
+                )
+            except ZeroDivisionError:
+                pass
+            else:
+                self.assertFalse("should have crashed")
+            # Second big batch search
+            Dnew, Inew = ivf_tools.big_batch_search(
+                index, ds.get_queries(),
+                k, method="knn_function",
+                threaded=4,
+                checkpoint=checkpoint, checkpoint_freq=4
+            )
+            self.assertLess((Inew != Iref).sum() / Iref.size, 1e-4)
+            np.testing.assert_almost_equal(Dnew, Dref, decimal=4)
+        finally:
+            if os.path.exists(checkpoint):
+                os.unlink(checkpoint)

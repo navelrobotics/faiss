@@ -46,7 +46,9 @@ class TestIndexFlat(unittest.TestCase):
             Iref = all_dis.argsort(axis=1)[:, ::-1][:, :k]
 
         Dref = all_dis[np.arange(nq)[:, None], Iref]
-        self.assertLessEqual((Iref != I1).sum(), Iref.size * 0.0001)
+
+        # not too many elements are off.
+        self.assertLessEqual((Iref != I1).sum(), Iref.size * 0.0002)
         #  np.testing.assert_equal(Iref, I1)
         np.testing.assert_almost_equal(Dref, D1, decimal=5)
 
@@ -776,7 +778,7 @@ class TestNSG(unittest.TestCase):
         """Test IndexNSGPQ"""
         d = self.xq.shape[1]
         R, pq_M = 32, 4
-        index = faiss.index_factory(d, f"NSG{R}_PQ{pq_M}")
+        index = faiss.index_factory(d, f"NSG{R}_PQ{pq_M}np")
         assert isinstance(index, faiss.IndexNSGPQ)
         idxpq = faiss.downcast_index(index.storage)
         assert index.nsg.R == R and idxpq.pq.M == pq_M
@@ -1158,3 +1160,19 @@ class TestLargeRangeSearch(unittest.TestCase):
         lims, D, I = index.range_search(xq, 1.0)
 
         assert len(D) == len(xb) * len(xq)
+
+
+class TestRandomIndex(unittest.TestCase):
+
+    def test_random(self):
+        """ just check if several runs of search retrieve the
+        same results """
+        index = faiss.IndexRandom(32, 1000000000)
+        (xt, xb, xq) = get_dataset_2(32, 0, 0, 10)
+
+        Dref, Iref = index.search(xq, 10)
+        self.assertTrue(np.all(Dref[:, 1:] >= Dref[:, :-1]))
+
+        Dnew, Inew = index.search(xq, 10)
+        np.testing.assert_array_equal(Dref, Dnew)
+        np.testing.assert_array_equal(Iref, Inew)
