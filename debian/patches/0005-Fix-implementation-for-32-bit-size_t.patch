@@ -10,10 +10,10 @@ Subject: Fix implementation for 32 bit size_t
  4 files changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
-index 535d239..44c5bb3 100644
+index 5dbf609..6660b71 100644
 --- a/faiss/index_factory.cpp
 +++ b/faiss/index_factory.cpp
-@@ -730,7 +730,7 @@ std::unique_ptr<Index> index_factory_sub(
+@@ -728,7 +728,7 @@ std::unique_ptr<Index> index_factory_sub(
      }
  
      if (verbose) {
@@ -23,7 +23,7 @@ index 535d239..44c5bb3 100644
                 parenthesis_indexes.size(),
                 d);
 diff --git a/faiss/invlists/DirectMap.cpp b/faiss/invlists/DirectMap.cpp
-index 6cb5202..1a5c3a6 100644
+index b276b76..63cf2d3 100644
 --- a/faiss/invlists/DirectMap.cpp
 +++ b/faiss/invlists/DirectMap.cpp
 @@ -199,7 +199,7 @@ size_t DirectMap::remove_ids(const IDSelector& sel, InvertedLists* invlists) {
@@ -36,7 +36,7 @@ index 6cb5202..1a5c3a6 100644
                  invlists->resize(list_no, last);
                  nremove++;
 diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
-index 5027c0e..8caded3 100644
+index 825ccfb..95bb5c9 100644
 --- a/faiss/invlists/OnDiskInvertedLists.cpp
 +++ b/faiss/invlists/OnDiskInvertedLists.cpp
 @@ -11,6 +11,7 @@
@@ -75,7 +75,7 @@ index 5027c0e..8caded3 100644
          begin_next = it->offset;
      }
 diff --git a/faiss/utils/utils.cpp b/faiss/utils/utils.cpp
-index 013bf38..175a537 100644
+index 894653b..6488a10 100644
 --- a/faiss/utils/utils.cpp
 +++ b/faiss/utils/utils.cpp
 @@ -160,7 +160,7 @@ size_t get_mem_usage_kb() {

@@ -8,7 +8,7 @@ Subject: Use system GTest
  2 files changed, 14 insertions(+), 7 deletions(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7430aac..de761c5 100644
+index fa1e312..63e3556 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -22,6 +22,7 @@ option(FAISS_OPT_LEVEL "" "generic")
@@ -20,10 +20,10 @@ index 7430aac..de761c5 100644
  if(FAISS_ENABLE_GPU)
    set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index d03a91c..af7f857 100644
+index 55455bd..442dfa4 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -37,18 +37,24 @@ else()
+@@ -40,18 +40,24 @@ else()
    target_link_libraries(faiss_test PRIVATE faiss)
  endif()
  

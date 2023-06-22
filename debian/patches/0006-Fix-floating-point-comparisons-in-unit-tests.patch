@@ -7,10 +7,10 @@ Subject: Fix floating point comparisons in unit tests
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/tests/test_lowlevel_ivf.cpp b/tests/test_lowlevel_ivf.cpp
-index 44450fc..3cb0b4e 100644
+index e28e2a9..a4d8410 100644
 --- a/tests/test_lowlevel_ivf.cpp
 +++ b/tests/test_lowlevel_ivf.cpp
-@@ -361,7 +361,7 @@ void test_lowlevel_access_binary(const char* index_key) {
+@@ -359,7 +359,7 @@ void test_lowlevel_access_binary(const char* index_key) {
                      float computed_D = scanner->distance_to_code(
                              xb.data() + vno * il->code_size);
  

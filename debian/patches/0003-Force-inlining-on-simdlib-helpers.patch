@@ -10,33 +10,33 @@ these calls only work if they are inlined by the compiler.
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/faiss/utils/simdlib_neon.h b/faiss/utils/simdlib_neon.h
-index 737e948..c45091a 100644
+index 1dbfa2c..6c6a028 100644
 --- a/faiss/utils/simdlib_neon.h
 +++ b/faiss/utils/simdlib_neon.h
-@@ -120,7 +120,7 @@ static inline std::string bin(const S& simd) {
- }
- 
- template <typename D, typename F, typename T>
--static inline void set1(D& d, F&& f, T t) {
-+static __attribute__((always_inline)) inline void set1(D& d, F&& f, T t) {
-     const auto v = f(t);
-     d.val[0] = v;
-     d.val[1] = v;
-@@ -143,7 +143,7 @@ static inline std::string elements_to_string(const char* fmt, const S& simd) {
- }
- 
- template <typename T, typename F>
--static inline T unary_func(const T& a, F&& f) {
-+static __attribute__((always_inline)) inline T unary_func(const T& a, F&& f) {
+@@ -147,7 +147,7 @@ struct set1_impl {
+     D& d;
      T t;
-     t.val[0] = f(a.val[0]);
-     t.val[1] = f(a.val[1]);
-@@ -151,7 +151,7 @@ static inline T unary_func(const T& a, F&& f) {
- }
- 
- template <typename T, typename F>
--static inline T binary_func(const T& a, const T& b, F&& f) {
-+static __attribute__((always_inline)) inline T binary_func(const T& a, const T& b, F&& f) {
-     T t;
-     t.val[0] = f(a.val[0], b.val[0]);
-     t.val[1] = f(a.val[1], b.val[1]);
+     template <remove_cv_ref_t<decltype(std::declval<D>().val[0])> (*F)(T)>
+-    inline void call() {
++    inline void call() __attribute__((always_inline)) {
+         const auto v = F(t);
+         d.val[0] = v;
+         d.val[1] = v;
+@@ -181,7 +181,7 @@ struct unary_func_impl {
+     using Telem = remove_cv_ref_t<decltype(std::declval<T>().val[0])>;
+     using Uelem = remove_cv_ref_t<decltype(std::declval<U>().val[0])>;
+     template <Telem (*F)(Uelem)>
+-    inline T call() {
++    inline T call() __attribute__((always_inline)) {
+         T t;
+         t.val[0] = F(a.val[0]);
+         t.val[1] = F(a.val[1]);
+@@ -208,7 +208,7 @@ struct binary_func_impl {
+     using Telem = remove_cv_ref_t<decltype(std::declval<T>().val[0])>;
+     using Uelem = remove_cv_ref_t<decltype(std::declval<U>().val[0])>;
+     template <Telem (*F)(Uelem, Uelem)>
+-    inline T call() {
++    inline T call() __attribute__((always_inline)) {
+         T t;
+         t.val[0] = F(a.val[0], b.val[0]);
+         t.val[1] = F(a.val[1], b.val[1]);
