@@ -24,9 +24,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#ifdef __SSE__
-#endif
-
 #include <faiss/Index2Layer.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/IndexIVFPQ.h>
@@ -35,6 +32,7 @@
 #include <faiss/utils/Heap.h>
 #include <faiss/utils/distances.h>
 #include <faiss/utils/random.h>
+#include <faiss/utils/sorting.h>
 
 extern "C" {
 
@@ -58,7 +56,6 @@ int sgemm_(
 
 namespace faiss {
 
-using idx_t = Index::idx_t;
 using MinimaxHeap = HNSW::MinimaxHeap;
 using storage_idx_t = HNSW::storage_idx_t;
 using NodeDistFarther = HNSW::NodeDistFarther;
@@ -101,7 +98,7 @@ struct NegativeDistanceComputer : DistanceComputer {
 };
 
 DistanceComputer* storage_distance_computer(const Index* storage) {
-    if (storage->metric_type == METRIC_INNER_PRODUCT) {
+    if (is_similarity_metric(storage->metric_type)) {
         return new NegativeDistanceComputer(storage->get_distance_computer());
     } else {
         return storage->get_distance_computer();
@@ -349,7 +346,7 @@ void IndexHNSW::search(
         InterruptCallback::check();
     }
 
-    if (metric_type == METRIC_INNER_PRODUCT) {
+    if (is_similarity_metric(metric_type)) {
         // we need to revert the negated distances
         for (size_t i = 0; i < k * n; i++) {
             distances[i] = -distances[i];

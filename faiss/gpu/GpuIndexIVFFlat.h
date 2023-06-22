@@ -44,7 +44,7 @@ class GpuIndexIVFFlat : public GpuIndexIVF {
     GpuIndexIVFFlat(
             GpuResourcesProvider* provider,
             int dims,
-            int nlist,
+            idx_t nlist,
             faiss::MetricType metric = faiss::METRIC_L2,
             GpuIndexIVFFlatConfig config = GpuIndexIVFFlatConfig());
 
@@ -54,7 +54,7 @@ class GpuIndexIVFFlat : public GpuIndexIVF {
             GpuResourcesProvider* provider,
             Index* coarseQuantizer,
             int dims,
-            int nlist,
+            idx_t nlist,
             faiss::MetricType metric = faiss::METRIC_L2,
             GpuIndexIVFFlatConfig config = GpuIndexIVFFlatConfig());
 
@@ -85,7 +85,7 @@ class GpuIndexIVFFlat : public GpuIndexIVF {
     void updateQuantizer() override;
 
     /// Trains the coarse quantizer based on the given vector data
-    void train(Index::idx_t n, const float* x) override;
+    void train(idx_t n, const float* x) override;
 
    protected:
     /// Our configuration options

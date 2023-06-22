@@ -23,8 +23,6 @@ namespace faiss {
 
 /** Any transformation applied on a set of vectors */
 struct VectorTransform {
-    typedef Index::idx_t idx_t;
-
     int d_in;  ///! input dimension
     int d_out; ///! output dimension
 
@@ -122,7 +120,7 @@ struct RandomRotationMatrix : LinearTransform {
     /// must be called before the transform is used
     void init(int seed);
 
-    // intializes with an arbitrary seed
+    // initializes with an arbitrary seed
     void train(idx_t n, const float* x) override;
 
     RandomRotationMatrix() {}

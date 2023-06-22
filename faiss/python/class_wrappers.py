@@ -476,16 +476,16 @@ def handle_Index(the_class):
         self.reconstruct_batch_c(n, swig_ptr(key), swig_ptr(x))
         return x
 
-    def replacement_reconstruct_n(self, n0, ni, x=None):
+    def replacement_reconstruct_n(self, n0=0, ni=-1, x=None):
         """Approximate reconstruction of vectors `n0` ... `n0 + ni - 1` from the index.
         Missing vectors trigger an exception.
 
         Parameters
         ----------
         n0 : int
-            Id of the first vector to reconstruct
+            Id of the first vector to reconstruct (default 0)
         ni : int
-            Number of vectors to reconstruct
+            Number of vectors to reconstruct (-1 = default = ntotal)
         x : array_like, optional
             pre-allocated array to store the results
 
@@ -494,6 +494,8 @@ def handle_Index(the_class):
         x : array_like
             Reconstructed vectors, size (`ni`, `self.d`), `dtype`=float32
         """
+        if ni == -1:
+            ni = self.ntotal
         if x is None:
             x = np.empty((ni, self.d), dtype=np.float32)
         else:
@@ -530,7 +532,7 @@ def handle_Index(the_class):
         Returns
         -------
         lims: array_like
-            Startring index of the results for each query vector, size n+1.
+            Starting index of the results for each query vector, size n+1.
         D : array_like
             Distances of the nearest neighbors, shape `lims[n]`. The distances for
             query i are in `D[lims[i]:lims[i+1]]`.
@@ -551,6 +553,70 @@ def handle_Index(the_class):
         D = rev_swig_ptr(res.distances, nd).copy()
         I = rev_swig_ptr(res.labels, nd).copy()
         return lims, D, I
+
+    def replacement_search_preassigned(self, x, k, Iq, Dq, *, params=None, D=None, I=None):
+        """Find the k nearest neighbors of the set of vectors x in an IVF index,
+        with precalculated coarse quantization assignment.
+
+        Parameters
+        ----------
+        x : array_like
+            Query vectors, shape (n, d) where d is appropriate for the index.
+            `dtype` must be float32.
+        k : int
+            Number of nearest neighbors.
+        Dq : array_like, optional
+            Distance array to the centroids, size (n, nprobe)
+        Iq : array_like, optional
+            Nearest centroids, size (n, nprobe)
+
+        params : SearchParameters
+            Search parameters of the current search (overrides the class-level params)
+        D : array_like, optional
+            Distance array to store the result.
+        I : array_like, optional
+            Labels array to store the results.
+
+        Returns
+        -------
+        D : array_like
+            Distances of the nearest neighbors, shape (n, k). When not enough results are found
+            the label is set to +Inf or -Inf.
+        I : array_like
+            Labels of the nearest neighbors, shape (n, k).
+            When not enough results are found, the label is set to -1
+        """
+        n, d = x.shape
+        x = np.ascontiguousarray(x, dtype='float32')
+        assert d == self.d
+        assert k > 0
+
+        if D is None:
+            D = np.empty((n, k), dtype=np.float32)
+        else:
+            assert D.shape == (n, k)
+
+        if I is None:
+            I = np.empty((n, k), dtype=np.int64)
+        else:
+            assert I.shape == (n, k)
+
+        Iq = np.ascontiguousarray(Iq, dtype='int64')
+        assert params is None, "params not supported"
+        assert Iq.shape == (n, self.nprobe)
+
+        if Dq is not None:
+            Dq = np.ascontiguousarray(Dq, dtype='float32')
+            assert Dq.shape == Iq.shape
+
+        self.search_preassigned_c(
+            n, swig_ptr(x),
+            k,
+            swig_ptr(Iq), swig_ptr(Dq),
+            swig_ptr(D), swig_ptr(I),
+            False
+        )
+        return D, I
 
     def replacement_sa_encode(self, x, codes=None):
         n, d = x.shape
@@ -603,6 +669,8 @@ def handle_Index(the_class):
                    ignore_missing=True)
     replace_method(the_class, 'search_and_reconstruct',
                    replacement_search_and_reconstruct, ignore_missing=True)
+    replace_method(the_class, 'search_preassigned',
+                   replacement_search_preassigned, ignore_missing=True)
     replace_method(the_class, 'sa_encode', replacement_sa_encode)
     replace_method(the_class, 'sa_decode', replacement_sa_decode)
     replace_method(the_class, 'add_sa_codes', replacement_add_sa_codes,
@@ -662,6 +730,31 @@ def handle_IndexBinary(the_class):
                       swig_ptr(labels))
         return distances, labels
 
+    def replacement_search_preassigned(self, x, k, Iq, Dq):
+        n, d = x.shape
+        x = _check_dtype_uint8(x)
+        assert d * 8 == self.d
+        assert k > 0
+
+        D = np.empty((n, k), dtype=np.int32)
+        I = np.empty((n, k), dtype=np.int64)
+
+        Iq = np.ascontiguousarray(Iq, dtype='int64')
+        assert Iq.shape == (n, self.nprobe)
+
+        if Dq is not None:
+            Dq = np.ascontiguousarray(Dq, dtype='int32')
+            assert Dq.shape == Iq.shape
+
+        self.search_preassigned_c(
+            n, swig_ptr(x),
+            k,
+            swig_ptr(Iq), swig_ptr(Dq),
+            swig_ptr(D), swig_ptr(I),
+            False
+        )
+        return D, I
+
     def replacement_range_search(self, x, thresh):
         n, d = x.shape
         x = _check_dtype_uint8(x)
@@ -691,6 +784,8 @@ def handle_IndexBinary(the_class):
     replace_method(the_class, 'range_search', replacement_range_search)
     replace_method(the_class, 'reconstruct', replacement_reconstruct)
     replace_method(the_class, 'remove_ids', replacement_remove_ids)
+    replace_method(the_class, 'search_preassigned',
+                   replacement_search_preassigned, ignore_missing=True)
 
 
 def handle_VectorTransform(the_class):
@@ -805,6 +900,26 @@ def handle_IndexRowwiseMinMax(the_class):
     replace_method(the_class, 'train_inplace', replacement_train_inplace)
 
 
+def handle_CodePacker(the_class):
+
+    def replacement_pack_1(self, x, offset, block):
+        assert x.shape == (self.code_size,)
+        nblock, block_size = block.shape
+        assert block_size == self.block_size
+        assert 0 <= offset < block_size * self.nvec
+        self.pack_1_c(swig_ptr(x), offset, faiss.swig_ptr(block))
+
+    def replacement_unpack_1(self, block, offset):
+        nblock, block_size = block.shape
+        assert block_size == self.block_size
+        assert 0 <= offset < block_size * self.nvec
+        x = np.zeros(self.code_size, dtype='uint8')
+        self.unpack_1_c(faiss.swig_ptr(block), offset, swig_ptr(x))
+        return x
+
+    replace_method(the_class, 'pack_1', replacement_pack_1)
+    replace_method(the_class, 'unpack_1', replacement_unpack_1)
+
 ######################################################
 # MapLong2Long interface
 ######################################################
@@ -825,7 +940,7 @@ def handle_MapLong2Long(the_class):
 
     replace_method(the_class, 'add', replacement_map_add)
     replace_method(the_class, 'search_multiple',
-                replacement_map_search_multiple)
+                   replacement_map_search_multiple)
 
 
 ######################################################
@@ -838,6 +953,7 @@ def add_to_referenced_objects(self, ref):
         self.referenced_objects = [ref]
     else:
         self.referenced_objects.append(ref)
+
 
 def handle_SearchParameters(the_class):
     """ this wrapper is to enable initializations of the form

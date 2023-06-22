@@ -141,6 +141,20 @@ TEST(TestGpuIndexFlat, L2_Float32) {
     }
 }
 
+// At least one test for the k > 1024 select
+TEST(TestGpuIndexFlat, L2_k_2048) {
+    if (faiss::gpu::getMaxKSelection() >= 2048) {
+        TestFlatOptions opt;
+        opt.metric = faiss::MetricType::METRIC_L2;
+        opt.useFloat16 = false;
+        opt.kOverride = 2048;
+        opt.dimOverride = 128;
+        opt.numVecsOverride = 10000;
+
+        testFlat(opt);
+    }
+}
+
 // test specialized k == 1 codepath
 TEST(TestGpuIndexFlat, L2_Float32_K1) {
     for (int tries = 0; tries < 3; ++tries) {
@@ -220,7 +234,7 @@ TEST(TestGpuIndexFlat, QueryEmpty) {
     std::vector<float> queries(numQuery * dim, 1.0f);
 
     std::vector<float> dist(numQuery * k, 0);
-    std::vector<faiss::Index::idx_t> ind(numQuery * k);
+    std::vector<faiss::idx_t> ind(numQuery * k);
 
     gpuIndex.search(numQuery, queries.data(), k, dist.data(), ind.data());
 
@@ -437,7 +451,7 @@ TEST(TestGpuIndexFlat, Residual) {
     cpuIndex.add(numVecs, vecs.data());
     gpuIndex.add(numVecs, vecs.data());
 
-    auto indexVecs = std::vector<faiss::Index::idx_t>{0, 2, 4, 6, 8};
+    auto indexVecs = std::vector<faiss::idx_t>{0, 2, 4, 6, 8};
     auto queryVecs = faiss::gpu::randVecs(indexVecs.size(), dim);
 
     auto residualsCpu = std::vector<float>(indexVecs.size() * dim);
@@ -517,7 +531,7 @@ TEST(TestGpuIndexFlat, Reconstruct) {
 
         // Test reconstruct_batch
         if (false) {
-            auto reconstructKeys = std::vector<faiss::Index::idx_t>{1, 3, 5};
+            auto reconstructKeys = std::vector<faiss::idx_t>{1, 3, 5};
             auto reconstructVecs =
                     std::vector<float>(reconstructKeys.size() * dim);
 
@@ -565,7 +579,7 @@ TEST(TestGpuIndexFlat, SearchAndReconstruct) {
     gpuIndex.add(nb, xb.data());
 
     std::vector<float> refDistance(nq * k, 0);
-    std::vector<faiss::Index::idx_t> refIndices(nq * k, -1);
+    std::vector<faiss::idx_t> refIndices(nq * k, -1);
     std::vector<float> refReconstruct(nq * k * dim, 0);
     cpuIndex.search_and_reconstruct(
             nq,
@@ -576,7 +590,7 @@ TEST(TestGpuIndexFlat, SearchAndReconstruct) {
             refReconstruct.data());
 
     std::vector<float> testDistance(nq * k, 0);
-    std::vector<faiss::Index::idx_t> testIndices(nq * k, -1);
+    std::vector<faiss::idx_t> testIndices(nq * k, -1);
     std::vector<float> testReconstruct(nq * k * dim, 0);
     gpuIndex.search_and_reconstruct(
             nq,
@@ -606,7 +620,7 @@ TEST(TestGpuIndexFlat, SearchAndReconstruct) {
     // above will ensure a decent number of matches), reconstruction should be
     // the same for the vectors that do match
     for (int i = 0; i < nq; ++i) {
-        std::unordered_map<faiss::Index::idx_t, int> refLocation;
+        std::unordered_map<faiss::idx_t, int> refLocation;
 
         for (int j = 0; j < k; ++j) {
             refLocation.insert(std::make_pair(refIndices[i * k + j], j));
