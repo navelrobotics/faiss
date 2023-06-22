@@ -1,3 +1,19 @@
+faiss (1.7.4-1) unstable; urgency=medium
+
+  * Team upload.
+
+  [ Debian Janitor ]
+  * Set upstream metadata fields: Bug-Database, Bug-Submit, Repository-Browse.
+
+  [ Timo Röhling ]
+  * Make package cross-buildable
+  * Fix build with gcc-13 (Closes: #1037643)
+  * New upstream version 1.7.4
+  * Refresh patches
+  * Bump Standards-Version to 4.6.2
+
+ -- Timo Röhling <roehling@debian.org>  Thu, 22 Jun 2023 22:13:41 +0200
+
 faiss (1.7.3-2) unstable; urgency=medium
 
   * Team upload.
