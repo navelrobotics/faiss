@@ -5,3 +5,4 @@
 0005-Fix-implementation-for-32-bit-size_t.patch
 0006-Fix-floating-point-comparisons-in-unit-tests.patch
 0007-Add-GTest-filter.patch
+0008-Fix-build-with-gcc-13.patch

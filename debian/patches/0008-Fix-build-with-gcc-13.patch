@@ -1,0 +1,20 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Thu, 22 Jun 2023 17:51:36 +0200
+Subject: Fix build with gcc-13
+
+---
+ faiss/Index.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/faiss/Index.h b/faiss/Index.h
+index 5225465..cefdd2b 100644
+--- a/faiss/Index.h
++++ b/faiss/Index.h
+@@ -11,6 +11,7 @@
+ #define FAISS_INDEX_H
+ 
+ #include <faiss/MetricType.h>
++#include <cstdint>
+ #include <cstdio>
+ #include <sstream>
+ #include <string>
