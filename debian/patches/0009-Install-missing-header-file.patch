@@ -1,0 +1,20 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Sat, 24 Jun 2023 21:29:46 +0200
+Subject: Install missing header file
+
+---
+ faiss/CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/faiss/CMakeLists.txt b/faiss/CMakeLists.txt
+index 34f1283..847ae34 100644
+--- a/faiss/CMakeLists.txt
++++ b/faiss/CMakeLists.txt
+@@ -145,6 +145,7 @@ set(FAISS_HEADERS
+   impl/AdditiveQuantizer.h
+   impl/AuxIndexStructures.h
+   impl/IDSelector.h
++  impl/CodePacker.h
+   impl/DistanceComputer.h
+   impl/FaissAssert.h
+   impl/FaissException.h
