@@ -1,3 +1,10 @@
+faiss (1.7.4-3) unstable; urgency=medium
+
+  * Team upload.
+  * Drop broken Neon inlining patch
+
+ -- Timo Röhling <roehling@debian.org>  Mon, 26 Jun 2023 16:06:31 +0200
+
 faiss (1.7.4-2) unstable; urgency=medium
 
   * Team upload.
