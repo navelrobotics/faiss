@@ -4,16 +4,15 @@ Subject: Fix implementation for 32 bit size_t
 
 ---
  faiss/index_factory.cpp                | 2 +-
- faiss/invlists/DirectMap.cpp           | 2 +-
- faiss/invlists/OnDiskInvertedLists.cpp | 7 ++++---
+ faiss/invlists/OnDiskInvertedLists.cpp | 5 +++--
  faiss/utils/utils.cpp                  | 2 +-
- 4 files changed, 7 insertions(+), 6 deletions(-)
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
-index 5dbf609..6660b71 100644
+index 0d61b73..883753e 100644
 --- a/faiss/index_factory.cpp
 +++ b/faiss/index_factory.cpp
-@@ -728,7 +728,7 @@ std::unique_ptr<Index> index_factory_sub(
+@@ -731,7 +731,7 @@ std::unique_ptr<Index> index_factory_sub(
      }
  
      if (verbose) {
@@ -22,21 +21,8 @@ index 5dbf609..6660b71 100644
                 description.c_str(),
                 parenthesis_indexes.size(),
                 d);
-diff --git a/faiss/invlists/DirectMap.cpp b/faiss/invlists/DirectMap.cpp
-index b276b76..63cf2d3 100644
---- a/faiss/invlists/DirectMap.cpp
-+++ b/faiss/invlists/DirectMap.cpp
-@@ -199,7 +199,7 @@ size_t DirectMap::remove_ids(const IDSelector& sel, InvertedLists* invlists) {
-                             last_id,
-                             ScopedCodes(invlists, list_no, last).get());
-                     // update hash entry for last element
--                    hashtable[last_id] = list_no << 32 | offset;
-+                    hashtable[last_id] = idx_t(list_no) << 32 | idx_t(offset);
-                 }
-                 invlists->resize(list_no, last);
-                 nremove++;
 diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
-index 825ccfb..95bb5c9 100644
+index 3017d16..2c234d7 100644
 --- a/faiss/invlists/OnDiskInvertedLists.cpp
 +++ b/faiss/invlists/OnDiskInvertedLists.cpp
 @@ -11,6 +11,7 @@
@@ -47,20 +33,11 @@ index 825ccfb..95bb5c9 100644
  #include <unordered_set>
  
  #include <sys/mman.h>
-@@ -325,7 +326,7 @@ void OnDiskInvertedLists::update_totsize(size_t new_size) {
- 
-     FAISS_THROW_IF_NOT_FMT(
-             err == 0,
--            "truncate %s to %ld: %s",
-+            "truncate %s to %zu: %s",
-             filename.c_str(),
-             totsize,
-             strerror(errno));
 @@ -524,7 +525,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
          it++;
      }
  
--    size_t inf = 1UL << 60;
+-    size_t inf = ((size_t)1) << 60;
 +    size_t inf = (std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() >> 1)) >> 1;
  
      size_t end_prev = inf;
@@ -69,16 +46,16 @@ index 825ccfb..95bb5c9 100644
          end_prev = prev->offset + prev->capacity;
      }
  
--    size_t begin_next = 1L << 60;
+-    size_t begin_next = ((size_t)1) << 60;
 +    size_t begin_next = inf;
      if (it != slots.end()) {
          begin_next = it->offset;
      }
 diff --git a/faiss/utils/utils.cpp b/faiss/utils/utils.cpp
-index 894653b..6488a10 100644
+index dc6fadd..147afb5 100644
 --- a/faiss/utils/utils.cpp
 +++ b/faiss/utils/utils.cpp
-@@ -160,7 +160,7 @@ size_t get_mem_usage_kb() {
+@@ -169,7 +169,7 @@ size_t get_mem_usage_kb() {
          char buf[256];
          if (!fgets(buf, 256, f))
              break;

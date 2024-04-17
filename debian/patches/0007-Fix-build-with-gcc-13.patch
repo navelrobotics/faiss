@@ -7,7 +7,7 @@ Subject: Fix build with gcc-13
  1 file changed, 1 insertion(+)
 
 diff --git a/faiss/Index.h b/faiss/Index.h
-index d73a684..91fe700 100644
+index 3d1bdb9..9fc9e19 100644
 --- a/faiss/Index.h
 +++ b/faiss/Index.h
 @@ -11,6 +11,7 @@

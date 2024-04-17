@@ -7,12 +7,12 @@ Subject: Install missing header file
  1 file changed, 1 insertion(+)
 
 diff --git a/faiss/CMakeLists.txt b/faiss/CMakeLists.txt
-index 34f1283..847ae34 100644
+index ee54600..aec195b 100644
 --- a/faiss/CMakeLists.txt
 +++ b/faiss/CMakeLists.txt
-@@ -145,6 +145,7 @@ set(FAISS_HEADERS
-   impl/AdditiveQuantizer.h
+@@ -149,6 +149,7 @@ set(FAISS_HEADERS
    impl/AuxIndexStructures.h
+   impl/CodePacker.h
    impl/IDSelector.h
 +  impl/CodePacker.h
    impl/DistanceComputer.h

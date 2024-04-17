@@ -3,16 +3,16 @@ Date: Sun, 6 Feb 2022 12:19:35 +0100
 Subject: Use system GTest
 
 ---
- CMakeLists.txt       |  1 +
- tests/CMakeLists.txt | 20 +++++++++++++-------
- 2 files changed, 14 insertions(+), 7 deletions(-)
+ CMakeLists.txt       | 1 +
+ tests/CMakeLists.txt | 8 +++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index fa1e312..63e3556 100644
+index 6cdc37c..7d0ad00 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -22,6 +22,7 @@ option(FAISS_OPT_LEVEL "" "generic")
- option(FAISS_ENABLE_GPU "Enable support for GPU indexes." ON)
+@@ -56,6 +56,7 @@ option(FAISS_ENABLE_GPU "Enable support for GPU indexes." ON)
+ option(FAISS_ENABLE_RAFT "Enable RAFT for GPU indexes." OFF)
  option(FAISS_ENABLE_PYTHON "Build Python extension." ON)
  option(FAISS_ENABLE_C_API "Build C API." OFF)
 +option(FAISS_USE_SYSTEM_GTEST "Use system-provided gtest library." ON)
@@ -20,26 +20,20 @@ index fa1e312..63e3556 100644
  if(FAISS_ENABLE_GPU)
    set(CMAKE_CUDA_HOST_COMPILER ${CMAKE_CXX_COMPILER})
 diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
-index 55455bd..442dfa4 100644
+index 10243b9..b716226 100644
 --- a/tests/CMakeLists.txt
 +++ b/tests/CMakeLists.txt
-@@ -40,18 +40,24 @@ else()
-   target_link_libraries(faiss_test PRIVATE faiss)
+@@ -58,18 +58,24 @@ if(FAISS_OPT_LEVEL STREQUAL "avx512")
+   target_link_libraries(faiss_test PRIVATE faiss_avx512)
  endif()
  
--include(FetchContent)
--FetchContent_Declare(googletest
--  URL "https://github.com/google/googletest/archive/release-1.12.1.tar.gz")
--set(BUILD_GMOCK CACHE BOOL OFF)
--set(INSTALL_GTEST CACHE BOOL OFF)
--FetchContent_MakeAvailable(googletest)
 +if(NOT FAISS_USE_SYSTEM_GTEST)
-+  include(FetchContent)
-+  FetchContent_Declare(googletest
-+    URL "https://github.com/google/googletest/archive/release-1.12.1.tar.gz")
-+  set(BUILD_GMOCK CACHE BOOL OFF)
-+  set(INSTALL_GTEST CACHE BOOL OFF)
-+  FetchContent_MakeAvailable(googletest)
+ include(FetchContent)
+ FetchContent_Declare(googletest
+   URL "https://github.com/google/googletest/archive/release-1.12.1.tar.gz")
+ set(BUILD_GMOCK CACHE BOOL OFF)
+ set(INSTALL_GTEST CACHE BOOL OFF)
+ FetchContent_MakeAvailable(googletest)
 +else()
 +  find_package(GTest REQUIRED)
 +  include_directories(${GTEST_INCLUDE_DIRS})
@@ -52,6 +46,6 @@ index 55455bd..442dfa4 100644
    OpenMP::OpenMP_CXX
 -  gtest_main
 +  GTest::gtest_main
+   $<$<BOOL:${FAISS_ENABLE_RAFT}>:raft::raft>
  )
  
- # Defines `gtest_discover_tests()`.
