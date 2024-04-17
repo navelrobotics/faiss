@@ -1,3 +1,15 @@
+faiss (1.8.0-1) unstable; urgency=medium
+
+  * Team upload.
+  * New upstream version 1.8.0
+  * Reformat d/control
+  * Bump Standards-Version to 4.7.0
+  * Fix FTBFS with swig >= 4.2.0 (Closes: #1061741)
+  * Build for all supported Python versions
+  * Run autopkgtest with all supported Python versions
+
+ -- Timo Röhling <roehling@debian.org>  Wed, 17 Apr 2024 18:05:40 +0200
+
 faiss (1.7.4-3) unstable; urgency=medium
 
   * Team upload.
