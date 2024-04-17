@@ -1,22 +1,21 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
+
 BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
 GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*
 
+export PYBUILD_SYSTEM = cmake
+export PYBUILD_CONFIGURE_ARGS = \
+	-DFAISS_ENABLE_GPU=OFF \
+	-DFAISS_ENABLE_PYTHON=ON \
+	-DFAISS_ENABLE_C_API=ON \
+	-DFAISS_USE_SYSTEM_GTEST=ON \
+	-DFAISS_GTEST_FILTER="$(GTEST_FILTER)" \
+	-DBUILD_TESTING=$(BUILD_TESTING)
+export PYBUILD_AFTER_INSTALL = \
+	cd {build_dir}/faiss/python \
+	&& {interpreter} setup.py install --root=$(CURDIR)/debian/python3-faiss --install-lib=/usr/lib/python{version}/site-packages
+
 %:
-	dh $@ --buildsystem=cmake --builddirectory=build
+	dh $@ --buildsystem=pybuild
 
-override_dh_auto_configure:
-	dh_auto_configure -- \
-		-DPython_FIND_UNVERSIONED_NAMES=FIRST \
-		-DFAISS_ENABLE_GPU=OFF \
-		-DFAISS_ENABLE_PYTHON=ON \
-		-DFAISS_ENABLE_C_API=ON \
-		-DFAISS_USE_SYSTEM_GTEST=ON \
-		-DFAISS_GTEST_FILTER="$(GTEST_FILTER)" \
-		-DBUILD_TESTING=$(BUILD_TESTING)
-
-execute_after_dh_auto_install:
-	cd build/faiss/python; \
-		python3 setup.py install --install-layout=deb \
-		--root=$(CURDIR)/debian/python3-faiss/
