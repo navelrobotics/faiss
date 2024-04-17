@@ -1,6 +1,13 @@
-Tests: test.py
+Tests: pythontest
+Depends:
+ python3-all,
+ python3-faiss,
 Restrictions: allow-stderr
 
 Tests: cmaketest
 Restrictions: allow-stderr
-Depends: libfaiss-dev, cmake, libgtest-dev, g++ | c++-compiler
+Depends:
+ cmake,
+ g++ | c++-compiler,
+ libfaiss-dev,
+ libgtest-dev,
