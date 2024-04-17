@@ -1,0 +1,32 @@
+From: =?utf-8?q?Timo_R=C3=B6hling?= <roehling@debian.org>
+Date: Wed, 17 Apr 2024 17:20:52 +0200
+Subject: Fix FTBFS with swig >= 4.2.0
+
+Origin: upstream, https://github.com/facebookresearch/faiss/pull/3315
+Bug: https://github.com/facebookresearch/faiss/issues/3239
+Bug-Debian: https://bugs.debian.org/1061741
+---
+ faiss/python/swigfaiss.swig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/faiss/python/swigfaiss.swig b/faiss/python/swigfaiss.swig
+index fb7f50d..c536676 100644
+--- a/faiss/python/swigfaiss.swig
++++ b/faiss/python/swigfaiss.swig
+@@ -1022,14 +1022,14 @@ PyObject *swig_ptr (PyObject *a)
+         return SWIG_NewPointerObj(data, SWIGTYPE_p_bool, 0);
+     }
+     if(PyArray_TYPE(ao) == NPY_UINT64) {
+-#ifdef SWIGWORDSIZE64
++#if (__SIZEOF_LONG__ == 8)
+         return SWIG_NewPointerObj(data, SWIGTYPE_p_unsigned_long, 0);
+ #else
+         return SWIG_NewPointerObj(data, SWIGTYPE_p_unsigned_long_long, 0);
+ #endif
+     }
+     if(PyArray_TYPE(ao) == NPY_INT64) {
+-#ifdef SWIGWORDSIZE64
++#if (__SIZEOF_LONG__ == 8)
+         return SWIG_NewPointerObj(data, SWIGTYPE_p_long, 0);
+ #else
+         return SWIG_NewPointerObj(data, SWIGTYPE_p_long_long, 0);
