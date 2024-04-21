@@ -7,3 +7,4 @@
 0007-Fix-build-with-gcc-13.patch
 0008-Install-missing-header-file.patch
 0009-Fix-FTBFS-with-swig-4.2.0.patch
+0010-Big-endian-support.patch

@@ -1,0 +1,584 @@
+From: Matthijs Douze <matthijs@meta.com>
+Date: Mon, 22 Apr 2024 00:31:45 +0200
+Subject: Big endian support
+
+Forwarded: https://github.com/facebookresearch/faiss/pull/3361
+---
+ contrib/vecs_io.py                      |  12 +++-
+ faiss/cppcontrib/detail/UintReader.h    | 121 +++++++++++++++++++++++++++-----
+ faiss/cppcontrib/sa_decode/Level2-inl.h | 114 ++++++++++++++++++++++--------
+ faiss/impl/platform_macros.h            |   8 +++
+ faiss/impl/pq4_fast_scan.cpp            |  11 +++
+ faiss/python/CMakeLists.txt             |  13 ++++
+ 6 files changed, 231 insertions(+), 48 deletions(-)
+
+diff --git a/contrib/vecs_io.py b/contrib/vecs_io.py
+index ea75d5f..5d18c0b 100644
+--- a/contrib/vecs_io.py
++++ b/contrib/vecs_io.py
+@@ -3,6 +3,7 @@
+ # This source code is licensed under the MIT license found in the
+ # LICENSE file in the root directory of this source tree.
+ 
++import sys
+ import numpy as np
+ 
+ """
+@@ -13,6 +14,8 @@ definition of the formats here: http://corpus-texmex.irisa.fr/
+ 
+ def ivecs_read(fname):
+     a = np.fromfile(fname, dtype='int32')
++    if sys.big_endian:
++        a.byteswap(inplace=True)
+     d = a[0]
+     return a.reshape(-1, d + 1)[:, 1:].copy()
+ 
+@@ -22,6 +25,7 @@ def fvecs_read(fname):
+ 
+ 
+ def ivecs_mmap(fname):
++    assert not sys.big_endian
+     a = np.memmap(fname, dtype='int32', mode='r')
+     d = a[0]
+     return a.reshape(-1, d + 1)[:, 1:]
+@@ -33,7 +37,11 @@ def fvecs_mmap(fname):
+ 
+ def bvecs_mmap(fname):
+     x = np.memmap(fname, dtype='uint8', mode='r')
+-    d = x[:4].view('int32')[0]
++    if sys.big_endian:
++        da = x[:4][::-1].copy()
++        d = da.view('int32')[0]
++    else:
++        d = x[:4].view('int32')[0]
+     return x.reshape(-1, d + 4)[:, 4:]
+ 
+ 
+@@ -42,6 +50,8 @@ def ivecs_write(fname, m):
+     m1 = np.empty((n, d + 1), dtype='int32')
+     m1[:, 0] = d
+     m1[:, 1:] = m
++    if sys.big_endian:
++        m1.byteswap(inplace=True)
+     m1.tofile(fname)
+ 
+ 
+diff --git a/faiss/cppcontrib/detail/UintReader.h b/faiss/cppcontrib/detail/UintReader.h
+index 81e600f..d0b5836 100644
+--- a/faiss/cppcontrib/detail/UintReader.h
++++ b/faiss/cppcontrib/detail/UintReader.h
+@@ -7,8 +7,18 @@
+ 
+ #pragma once
+ 
++#include <faiss/impl/platform_macros.h>
+ #include <cstdint>
+ 
++#ifdef FAISS_BIG_ENDIAN
++#define Swap2Bytes(val) ((((val) >> 8) & 0x00FF) | (((val) << 8) & 0xFF00))
++
++#define Swap4Bytes(val)                                           \
++    ((((val) >> 24) & 0x000000FF) | (((val) >> 8) & 0x0000FF00) | \
++     (((val) << 8) & 0x00FF0000) | (((val) << 24) & 0xFF000000))
++
++#endif
++
+ namespace faiss {
+ namespace cppcontrib {
+ namespace detail {
+@@ -31,7 +41,11 @@ struct Uint8Reader {
+                 if (N_ELEMENTS > CPOS + 3) {
+                     const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    return (code32) >> 24;
++#else
+                     return (code32 & 0x000000FF);
++#endif
+                 } else {
+                     return codes[CPOS];
+                 }
+@@ -40,7 +54,11 @@ struct Uint8Reader {
+                 if (N_ELEMENTS > CPOS + 2) {
+                     const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    return (code32 & 0x00FF0000) >> 16;
++#else
+                     return (code32 & 0x0000FF00) >> 8;
++#endif
+                 } else {
+                     return codes[CPOS];
+                 }
+@@ -49,7 +67,11 @@ struct Uint8Reader {
+                 if (N_ELEMENTS > CPOS + 1) {
+                     const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    return (code32 & 0x0000FF00) >> 8;
++#else
+                     return (code32 & 0x00FF0000) >> 16;
++#endif
+                 } else {
+                     return codes[CPOS];
+                 }
+@@ -58,7 +80,11 @@ struct Uint8Reader {
+                 if (N_ELEMENTS > CPOS) {
+                     const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    return (code32 & 0x000000FF);
++#else
+                     return (code32) >> 24;
++#endif
+                 } else {
+                     return codes[CPOS];
+                 }
+@@ -87,40 +113,61 @@ struct Uint10Reader {
+         switch (SUB_ELEMENT) {
+             case 0: {
+                 if (N_ELEMENTS > CPOS + 2) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 5);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b0000001111111111);
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 5 + 0);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b0000001111111111);
+                 }
+             }
+             case 1: {
+                 if (N_ELEMENTS > CPOS + 1) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 5);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b000011111111110000000000) >> 10;
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 5 + 1);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b0000111111111100) >> 2;
+                 }
+             }
+             case 2: {
+                 if (N_ELEMENTS > CPOS) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 5);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b00111111111100000000000000000000) >> 20;
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 5 + 2);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b0011111111110000) >> 4;
+                 }
+             }
+             case 3: {
+-                const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                         codes + ELEMENT_TO_READ * 5 + 3);
++#ifdef FAISS_BIG_ENDIAN
++                code16 = Swap2Bytes(code16);
++#endif
+                 return (code16 & 0b1111111111000000) >> 6;
+             }
+         }
+@@ -147,45 +194,69 @@ struct Uint12Reader {
+         switch (SUB_ELEMENT) {
+             case 0: {
+                 if (N_ELEMENTS > CPOS + 2) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 6);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b0000111111111111);
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 0);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b0000111111111111);
+                 }
+             }
+             case 1: {
+                 if (N_ELEMENTS > CPOS + 1) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 6);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b111111111111000000000000) >> 12;
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 1);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b1111111111110000) >> 4;
+                 }
+             }
+             case 2: {
+                 if (N_ELEMENTS > CPOS + 1) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 2);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b000011111111111100000000) >> 8;
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 3);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b0000111111111111);
+                 }
+             }
+             case 3: {
+                 if (N_ELEMENTS > CPOS) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 2);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0b11111111111100000000000000000000) >> 20;
+                 } else {
+-                    const uint16_t code16 = *reinterpret_cast<const uint16_t*>(
++                    uint16_t code16 = *reinterpret_cast<const uint16_t*>(
+                             codes + ELEMENT_TO_READ * 6 + 4);
++#ifdef FAISS_BIG_ENDIAN
++                    code16 = Swap2Bytes(code16);
++#endif
+                     return (code16 & 0b1111111111110000) >> 4;
+                 }
+             }
+@@ -208,23 +279,39 @@ struct Uint16Reader {
+         switch (SUB_ELEMENT) {
+             case 0: {
+                 if (N_ELEMENTS > CPOS + 1) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return (code32 & 0x0000FFFF);
+                 } else {
+                     const uint16_t* const __restrict codesFp16 =
+                             reinterpret_cast<const uint16_t*>(codes);
++#ifdef FAISS_BIG_ENDIAN
++                    uint16_t rt = codesFp16[CPOS];
++                    rt = Swap2Bytes(rt);
++                    return rt;
++#endif
+                     return codesFp16[CPOS];
+                 }
+             }
+             case 1: {
+                 if (N_ELEMENTS > CPOS) {
+-                    const uint32_t code32 = *reinterpret_cast<const uint32_t*>(
++                    uint32_t code32 = *reinterpret_cast<const uint32_t*>(
+                             codes + ELEMENT_TO_READ * 4);
++#ifdef FAISS_BIG_ENDIAN
++                    code32 = Swap4Bytes(code32);
++#endif
+                     return code32 >> 16;
+                 } else {
+                     const uint16_t* const __restrict codesFp16 =
+                             reinterpret_cast<const uint16_t*>(codes);
++#ifdef FAISS_BIG_ENDIAN
++                    uint16_t rt = codesFp16[CPOS];
++                    rt = Swap2Bytes(rt);
++                    return rt;
++#endif
+                     return codesFp16[CPOS];
+                 }
+             }
+diff --git a/faiss/cppcontrib/sa_decode/Level2-inl.h b/faiss/cppcontrib/sa_decode/Level2-inl.h
+index 36355af..4f9bdc4 100644
+--- a/faiss/cppcontrib/sa_decode/Level2-inl.h
++++ b/faiss/cppcontrib/sa_decode/Level2-inl.h
+@@ -12,6 +12,16 @@
+ #include <cstdint>
+ 
+ #include <faiss/cppcontrib/detail/CoarseBitType.h>
++#include <faiss/impl/platform_macros.h>
++
++#ifdef FAISS_BIG_ENDIAN
++#define Swap2Bytes(val) ((((val) >> 8) & 0x00FF) | (((val) << 8) & 0xFF00))
++#endif
++
++#ifndef FAISS_BIG_ENDIAN
++#define FAISS_BIG_ENDIAN 0
++#define Swap2Bytes(val) val
++#endif
+ 
+ namespace faiss {
+ namespace cppcontrib {
+@@ -72,9 +82,14 @@ struct Index2LevelDecoder {
+             const intptr_t coarseCentroidOffset = i % COARSE_SIZE;
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+-
+-            const intptr_t coarseCode = coarse[coarseCentroidIdx];
+-            const intptr_t fineCode = fine[fineCentroidIdx];
++            intptr_t coarseCode, fineCode;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode = Swap2Bytes(coarse[coarseCentroidIdx]);
++                fineCode = Swap2Bytes(fine[fineCentroidIdx]);
++            } else {
++                coarseCode = coarse[coarseCentroidIdx];
++                fineCode = fine[fineCentroidIdx];
++            }
+ 
+             const float* const __restrict coarsePtr = pqCoarseCentroids +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode) *
+@@ -112,9 +127,14 @@ struct Index2LevelDecoder {
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+ 
+-            const intptr_t coarseCode = coarse[coarseCentroidIdx];
+-            const intptr_t fineCode = fine[fineCentroidIdx];
+-
++            intptr_t coarseCode, fineCode;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode = Swap2Bytes(coarse[coarseCentroidIdx]);
++                fineCode = Swap2Bytes(fine[fineCentroidIdx]);
++            } else {
++                coarseCode = coarse[coarseCentroidIdx];
++                fineCode = fine[fineCentroidIdx];
++            }
+             const float* const __restrict coarsePtr = pqCoarseCentroids +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode) *
+                             COARSE_SIZE +
+@@ -162,11 +182,18 @@ struct Index2LevelDecoder {
+             const intptr_t coarseCentroidOffset = i % COARSE_SIZE;
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+-
+-            const intptr_t coarseCode0 = coarse0[coarseCentroidIdx];
+-            const intptr_t fineCode0 = fine0[fineCentroidIdx];
+-            const intptr_t coarseCode1 = coarse1[coarseCentroidIdx];
+-            const intptr_t fineCode1 = fine1[fineCentroidIdx];
++            intptr_t coarseCode0, coarseCode1, fineCode0, fineCode1;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode0 = Swap2Bytes(coarse0[coarseCentroidIdx]);
++                fineCode0 = Swap2Bytes(fine0[fineCentroidIdx]);
++                coarseCode1 = Swap2Bytes(coarse1[coarseCentroidIdx]);
++                fineCode1 = Swap2Bytes(fine1[fineCentroidIdx]);
++            } else {
++                coarseCode0 = coarse0[coarseCentroidIdx];
++                fineCode0 = fine0[fineCentroidIdx];
++                coarseCode1 = coarse1[coarseCentroidIdx];
++                fineCode1 = fine1[fineCentroidIdx];
++            }
+ 
+             const float* const __restrict coarsePtr0 = pqCoarseCentroids0 +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode0) *
+@@ -222,11 +249,18 @@ struct Index2LevelDecoder {
+             const intptr_t coarseCentroidOffset = i % COARSE_SIZE;
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+-
+-            const intptr_t coarseCode0 = coarse0[coarseCentroidIdx];
+-            const intptr_t fineCode0 = fine0[fineCentroidIdx];
+-            const intptr_t coarseCode1 = coarse1[coarseCentroidIdx];
+-            const intptr_t fineCode1 = fine1[fineCentroidIdx];
++            intptr_t coarseCode0, coarseCode1, fineCode0, fineCode1;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode0 = Swap2Bytes(coarse0[coarseCentroidIdx]);
++                fineCode0 = Swap2Bytes(fine0[fineCentroidIdx]);
++                coarseCode1 = Swap2Bytes(coarse1[coarseCentroidIdx]);
++                fineCode1 = Swap2Bytes(fine1[fineCentroidIdx]);
++            } else {
++                coarseCode0 = coarse0[coarseCentroidIdx];
++                fineCode0 = fine0[fineCentroidIdx];
++                coarseCode1 = coarse1[coarseCentroidIdx];
++                fineCode1 = fine1[fineCentroidIdx];
++            }
+ 
+             const float* const __restrict coarsePtr0 = pqCoarseCentroids +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode0) *
+@@ -292,13 +326,23 @@ struct Index2LevelDecoder {
+             const intptr_t coarseCentroidOffset = i % COARSE_SIZE;
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+-
+-            const intptr_t coarseCode0 = coarse0[coarseCentroidIdx];
+-            const intptr_t fineCode0 = fine0[fineCentroidIdx];
+-            const intptr_t coarseCode1 = coarse1[coarseCentroidIdx];
+-            const intptr_t fineCode1 = fine1[fineCentroidIdx];
+-            const intptr_t coarseCode2 = coarse2[coarseCentroidIdx];
+-            const intptr_t fineCode2 = fine2[fineCentroidIdx];
++            intptr_t coarseCode0, coarseCode1, fineCode0, fineCode1;
++            intptr_t coarseCode2, fineCode2;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode0 = Swap2Bytes(coarse0[coarseCentroidIdx]);
++                fineCode0 = Swap2Bytes(fine0[fineCentroidIdx]);
++                coarseCode1 = Swap2Bytes(coarse1[coarseCentroidIdx]);
++                fineCode1 = Swap2Bytes(fine1[fineCentroidIdx]);
++                coarseCode2 = Swap2Bytes(coarse2[coarseCentroidIdx]);
++                fineCode2 = Swap2Bytes(fine2[fineCentroidIdx]);
++            } else {
++                coarseCode0 = coarse0[coarseCentroidIdx];
++                fineCode0 = fine0[fineCentroidIdx];
++                coarseCode1 = coarse1[coarseCentroidIdx];
++                fineCode1 = fine1[fineCentroidIdx];
++                coarseCode2 = coarse2[coarseCentroidIdx];
++                fineCode2 = fine2[fineCentroidIdx];
++            }
+ 
+             const float* const __restrict coarsePtr0 = pqCoarseCentroids0 +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode0) *
+@@ -369,13 +413,23 @@ struct Index2LevelDecoder {
+             const intptr_t coarseCentroidOffset = i % COARSE_SIZE;
+             const intptr_t fineCentroidIdx = i / FINE_SIZE;
+             const intptr_t fineCentroidOffset = i % FINE_SIZE;
+-
+-            const intptr_t coarseCode0 = coarse0[coarseCentroidIdx];
+-            const intptr_t fineCode0 = fine0[fineCentroidIdx];
+-            const intptr_t coarseCode1 = coarse1[coarseCentroidIdx];
+-            const intptr_t fineCode1 = fine1[fineCentroidIdx];
+-            const intptr_t coarseCode2 = coarse2[coarseCentroidIdx];
+-            const intptr_t fineCode2 = fine2[fineCentroidIdx];
++            intptr_t coarseCode0, fineCode0, coarseCode1, fineCode1;
++            intptr_t coarseCode2, fineCode2;
++            if (FAISS_BIG_ENDIAN && sizeof(coarse_storage_type) == 2) {
++                coarseCode0 = Swap2Bytes(coarse0[coarseCentroidIdx]);
++                fineCode0 = Swap2Bytes(fine0[fineCentroidIdx]);
++                coarseCode1 = Swap2Bytes(coarse1[coarseCentroidIdx]);
++                fineCode1 = Swap2Bytes(fine1[fineCentroidIdx]);
++                coarseCode2 = Swap2Bytes(coarse2[coarseCentroidIdx]);
++                fineCode2 = Swap2Bytes(fine2[fineCentroidIdx]);
++            } else {
++                coarseCode0 = coarse0[coarseCentroidIdx];
++                fineCode0 = fine0[fineCentroidIdx];
++                coarseCode1 = coarse1[coarseCentroidIdx];
++                fineCode1 = fine1[fineCentroidIdx];
++                coarseCode2 = coarse2[coarseCentroidIdx];
++                fineCode2 = fine2[fineCentroidIdx];
++            }
+ 
+             const float* const __restrict coarsePtr0 = pqCoarseCentroids +
+                     (coarseCentroidIdx * COARSE_TABLE_BYTES + coarseCode0) *
+diff --git a/faiss/impl/platform_macros.h b/faiss/impl/platform_macros.h
+index 2aecc51..57e2343 100644
+--- a/faiss/impl/platform_macros.h
++++ b/faiss/impl/platform_macros.h
+@@ -165,3 +165,11 @@ inline int __builtin_clzll(uint64_t x) {
+ #endif
+ 
+ // clang-format on
++
++/*******************************************************
++ * BIGENDIAN specific macros
++ *******************************************************/
++#if !defined(_MSC_VER) && \
++        (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__))
++#define FAISS_BIG_ENDIAN 1
++#endif
+diff --git a/faiss/impl/pq4_fast_scan.cpp b/faiss/impl/pq4_fast_scan.cpp
+index 6173ece..127646e 100644
+--- a/faiss/impl/pq4_fast_scan.cpp
++++ b/faiss/impl/pq4_fast_scan.cpp
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <faiss/impl/FaissAssert.h>
++#include <faiss/impl/platform_macros.h>
+ #include <faiss/impl/pq4_fast_scan.h>
+ #include <faiss/impl/simd_result_handlers.h>
+ 
+@@ -58,8 +59,13 @@ void pq4_pack_codes(
+         return;
+     }
+     memset(blocks, 0, nb * nsq / 2);
++#ifdef FAISS_BIG_ENDIAN
++    const uint8_t perm0[16] = {
++            8, 0, 9, 1, 10, 2, 11, 3, 12, 4, 13, 5, 14, 6, 15, 7};
++#else
+     const uint8_t perm0[16] = {
+             0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15};
++#endif
+ 
+     uint8_t* codes2 = blocks;
+     for (size_t i0 = 0; i0 < nb; i0 += bbs) {
+@@ -93,8 +99,13 @@ void pq4_pack_codes_range(
+         size_t bbs,
+         size_t nsq,
+         uint8_t* blocks) {
++#ifdef FAISS_BIG_ENDIAN
++    const uint8_t perm0[16] = {
++            8, 0, 9, 1, 10, 2, 11, 3, 12, 4, 13, 5, 14, 6, 15, 7};
++#else
+     const uint8_t perm0[16] = {
+             0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15};
++#endif
+ 
+     // range of affected blocks
+     size_t block0 = i0 / bbs;
+diff --git a/faiss/python/CMakeLists.txt b/faiss/python/CMakeLists.txt
+index 26eaa54..f1a24dc 100644
+--- a/faiss/python/CMakeLists.txt
++++ b/faiss/python/CMakeLists.txt
+@@ -73,11 +73,20 @@ else()
+   find_package(faiss REQUIRED)
+ endif()
+ 
++if (${CMAKE_SYSTEM_NAME} MATCHES "AIX")
++swig_add_library(swigfaiss
++  TYPE MODULE
++  LANGUAGE python
++  SOURCES swigfaiss.swig
++)
++else ()
+ swig_add_library(swigfaiss
+   TYPE SHARED
+   LANGUAGE python
+   SOURCES swigfaiss.swig
+ )
++endif()
++
+ set_property(TARGET swigfaiss PROPERTY SWIG_COMPILE_OPTIONS -doxygen)
+ 
+ set_property(SOURCE swigfaiss_avx2.swig
+@@ -166,6 +175,10 @@ set_property(TARGET faiss_python_callbacks
+   PROPERTY POSITION_INDEPENDENT_CODE ON
+ )
+ 
++if (${CMAKE_SYSTEM_NAME} MATCHES "AIX")
++target_link_libraries(faiss_python_callbacks PRIVATE faiss)
++endif()
++
+ # Hack so that python_callbacks.h can be included as
+ # `#include <faiss/python/python_callbacks.h>`.
+ target_include_directories(faiss_python_callbacks PRIVATE ${PROJECT_SOURCE_DIR}/../..)
