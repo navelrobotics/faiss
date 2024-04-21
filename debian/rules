@@ -1,17 +1,32 @@
 #!/usr/bin/make -f
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
 
+include /usr/share/dpkg/architecture.mk
+
 BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
-GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*:testCppcontribSaDecode*
+GTEST_FILTER = -MEM_LEAK.*
+ifeq ($(DEB_HOST_ARCH_BITS),32)
+GTEST_FILTER += :TEST_CPPCONTRIB_*:testCppcontribSaDecode*
+endif
 
 export PYBUILD_SYSTEM = cmake
-export PYBUILD_CONFIGURE_ARGS = \
+
+COMMON_CONFIGURE_ARGS = \
 	-DFAISS_ENABLE_GPU=OFF \
 	-DFAISS_ENABLE_PYTHON=ON \
-	-DFAISS_ENABLE_C_API=ON \
 	-DFAISS_USE_SYSTEM_GTEST=ON \
-	-DFAISS_GTEST_FILTER="$(GTEST_FILTER)" \
-	-DBUILD_TESTING=$(BUILD_TESTING)
+	-DFAISS_GTEST_FILTER="$(GTEST_FILTER)"
+
+export PYBUILD_CONFIGURE_ARGS = \
+	$(COMMON_CONFIGURE_ARGS) \
+	-DBUILD_TESTING=OFF \
+	-DFAISS_ENABLE_C_API=OFF
+
+export PYBUILD_CONFIGURE_ARGS_$(shell py3versions -d) = \
+	$(COMMON_CONFIGURE_ARGS) \
+	-DBUILD_TESTING=$(BUILD_TESTING) \
+	-DFAISS_ENABLE_C_API=ON
+
 export PYBUILD_AFTER_INSTALL = \
 	cd {build_dir}/faiss/python \
 	&& {interpreter} setup.py install --root=$(CURDIR)/debian/python3-faiss --install-lib=/usr/lib/python{version}/site-packages
