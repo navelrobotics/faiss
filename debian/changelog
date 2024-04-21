@@ -1,3 +1,13 @@
+faiss (1.8.0-2) unstable; urgency=medium
+
+  * Team upload.
+  * Improve patch for 32 bit architectures
+  * Add patch for big endian support
+  * Skip broken testCppcontribSaDecode tests again
+  * Build C API only once
+
+ -- Timo Röhling <roehling@debian.org>  Mon, 22 Apr 2024 00:47:09 +0200
+
 faiss (1.8.0-1) unstable; urgency=medium
 
   * Team upload.
