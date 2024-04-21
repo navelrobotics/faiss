@@ -3,11 +3,39 @@ Date: Wed, 9 Feb 2022 01:28:47 +0100
 Subject: Fix implementation for 32 bit size_t
 
 ---
+ faiss/IndexIVF.cpp                     | 2 +-
+ faiss/IndexIVFIndependentQuantizer.cpp | 2 +-
  faiss/index_factory.cpp                | 2 +-
- faiss/invlists/OnDiskInvertedLists.cpp | 5 +++--
+ faiss/invlists/OnDiskInvertedLists.cpp | 4 ++--
  faiss/utils/utils.cpp                  | 2 +-
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
+diff --git a/faiss/IndexIVF.cpp b/faiss/IndexIVF.cpp
+index 95d3bc9..ffaae4a 100644
+--- a/faiss/IndexIVF.cpp
++++ b/faiss/IndexIVF.cpp
+@@ -1150,7 +1150,7 @@ void IndexIVF::train(idx_t n, const float* x) {
+     // optional subsampling
+     idx_t max_nt = train_encoder_num_vectors();
+     if (max_nt <= 0) {
+-        max_nt = (size_t)1 << 35;
++        max_nt = (size_t)1 << 30;
+     }
+ 
+     TransformedVectors tv(
+diff --git a/faiss/IndexIVFIndependentQuantizer.cpp b/faiss/IndexIVFIndependentQuantizer.cpp
+index 2073dd2..d5be6e3 100644
+--- a/faiss/IndexIVFIndependentQuantizer.cpp
++++ b/faiss/IndexIVFIndependentQuantizer.cpp
+@@ -140,7 +140,7 @@ void IndexIVFIndependentQuantizer::train(idx_t n, const float* x) {
+     // optional subsampling
+     idx_t max_nt = index_ivf->train_encoder_num_vectors();
+     if (max_nt <= 0) {
+-        max_nt = (size_t)1 << 35;
++        max_nt = (size_t)1 << 30;
+     }
+     SubsampledVectors sv(index_ivf->d, &n, max_nt, x);
+ 
 diff --git a/faiss/index_factory.cpp b/faiss/index_factory.cpp
 index 0d61b73..883753e 100644
 --- a/faiss/index_factory.cpp
@@ -22,27 +50,19 @@ index 0d61b73..883753e 100644
                 parenthesis_indexes.size(),
                 d);
 diff --git a/faiss/invlists/OnDiskInvertedLists.cpp b/faiss/invlists/OnDiskInvertedLists.cpp
-index 3017d16..2c234d7 100644
+index 3017d16..b363747 100644
 --- a/faiss/invlists/OnDiskInvertedLists.cpp
 +++ b/faiss/invlists/OnDiskInvertedLists.cpp
-@@ -11,6 +11,7 @@
- 
- #include <pthread.h>
- 
-+#include <limits>
- #include <unordered_set>
- 
- #include <sys/mman.h>
-@@ -524,7 +525,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+@@ -524,7 +524,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
          it++;
      }
  
 -    size_t inf = ((size_t)1) << 60;
-+    size_t inf = (std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() >> 1)) >> 1;
++    size_t inf = size_t(1) << (8 * __SIZEOF_SIZE_T__ - 2);
  
      size_t end_prev = inf;
      if (it != slots.begin()) {
-@@ -533,7 +534,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
+@@ -533,7 +533,7 @@ void OnDiskInvertedLists::free_slot(size_t offset, size_t capacity) {
          end_prev = prev->offset + prev->capacity;
      }
  
