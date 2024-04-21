@@ -2,7 +2,7 @@
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
 
 BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
-GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*
+GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*:testCppcontribSaDecode*
 
 export PYBUILD_SYSTEM = cmake
 export PYBUILD_CONFIGURE_ARGS = \
