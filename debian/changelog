@@ -1,3 +1,10 @@
+faiss (1.8.0-4) unstable; urgency=medium
+
+  * Team upload.
+  * Clean source tree after build
+
+ -- Timo Röhling <roehling@debian.org>  Mon, 22 Apr 2024 14:58:06 +0200
+
 faiss (1.8.0-3) unstable; urgency=medium
 
   * Team upload.
