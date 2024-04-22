@@ -4,9 +4,10 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all future=+lfs
 include /usr/share/dpkg/architecture.mk
 
 BUILD_TESTING = $(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),OFF,ON)
-GTEST_FILTER = -MEM_LEAK.*
 ifeq ($(DEB_HOST_ARCH_BITS),32)
-GTEST_FILTER += :TEST_CPPCONTRIB_*:testCppcontribSaDecode*
+GTEST_FILTER = -MEM_LEAK.*:TEST_CPPCONTRIB_*:testCppcontribSaDecode*
+else
+GTEST_FILTER = -MEM_LEAK.*
 endif
 
 export PYBUILD_SYSTEM = cmake
