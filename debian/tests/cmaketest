@@ -10,10 +10,17 @@ cmake_minimum_required(VERSION 3.17)\
 project(autopkgtest)\
 find_package(faiss REQUIRED)\
 include_directories(../include)' CMakeLists.txt
+GTEST_FILTER="-MEM_LEAK.*"
+if test `dpkg-architecture -qDEB_HOST_ARCH_BITS` = 32
+then
+	GTEST_FILTER="${GTEST_FILTER}:testCppcontribSaDecode*"
+fi
+
 set -x
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DFAISS_USE_SYSTEM_GTEST=ON
 make VERBOSE=ON
-./faiss_test --gtest_filter="-MEM_LEAK.*:TEST_CPPCONTRIB_*"
+
+./faiss_test --gtest_filter="${GTEST_FILTER}"
 
