@@ -1,3 +1,10 @@
+faiss (1.8.0-5) unstable; urgency=medium
+
+  * Team upload.
+  * Update GTest filter in autopkgtest
+
+ -- Timo Röhling <roehling@debian.org>  Wed, 24 Apr 2024 10:54:33 +0200
+
 faiss (1.8.0-4) unstable; urgency=medium
 
   * Team upload.
