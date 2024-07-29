@@ -3,25 +3,16 @@ Section: science
 Homepage: https://github.com/facebookresearch/faiss
 Priority: optional
 Standards-Version: 4.7.0
-Vcs-Git: https://salsa.debian.org/deeplearning-team/faiss.git
-Vcs-Browser: https://salsa.debian.org/deeplearning-team/faiss
-Maintainer: Debian Deep Learning Team <debian-ai@lists.debian.org>
-Uploaders: Mo Zhou <lumin@debian.org>
+Vcs-Git: https://github.com/navelrobotics/faiss.git
+Vcs-Browser: https://github.com/navelrobotics/faiss
+Maintainer: navel robotics GmbH <debmaint@navelrobotics.com>
 Rules-Requires-Root: no
 Build-Depends:
  cmake,
  debhelper-compat (= 13),
- dh-python,
- dh-sequence-python3,
- dh-sequence-numpy3,
  libblas-dev,
  libgtest-dev,
  liblapack-dev,
- libpython3-all-dev,
- python3-all-dev:any,
- python3-numpy,
- python3-setuptools,
- swig,
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
@@ -30,28 +21,26 @@ Description: efficient similarity search and clustering of dense vectors
  for Python/numpy. Some of the most useful algorithms are implemented on the
  GPU. It is developed by Facebook AI Research.
 
+Package: libfaiss
+Section: libs
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: ${source:Synopsis}
+ ${source:Extended-Description}
+ .
+ This package contains the CPU-only version of the runtime library.
+
 Package: libfaiss-dev
 Section: libdevel
 Architecture: any
 Multi-Arch: same
 Depends:
  ${misc:Depends},
- libblas-dev | libblas.so,
- liblapack-dev | liblapack.so,
+ libfaiss (= ${binary:Version}),
 Description: ${source:Synopsis}
  ${source:Extended-Description}
  .
  This package contains the CPU-only version of the development files.
-
-Package: python3-faiss
-Section: python
-Architecture: any
-Depends:
- ${misc:Depends},
- ${python3:Depends},
- ${shlibs:Depends},
-Description: Python 3 module for ${source:Synopsis}
- ${source:Extended-Description}
- .
- This package contains the CPU-only version of the Python interface.
-
