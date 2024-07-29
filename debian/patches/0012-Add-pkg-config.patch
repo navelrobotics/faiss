@@ -1,0 +1,31 @@
+--- faiss.orig/faiss/CMakeLists.txt
++++ faiss/faiss/CMakeLists.txt
+@@ -352,6 +352,16 @@ foreach(header ${FAISS_HEADERS})
+   )
+ endforeach()
+ 
++configure_file(
++  ${CMAKE_CURRENT_SOURCE_DIR}/libfaiss.pc.in
++  ${CMAKE_CURRENT_BINARY_DIR}/libfaiss.pc
++  @ONLY
++)
++install(
++  FILES ${CMAKE_CURRENT_BINARY_DIR}/libfaiss.pc
++  DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
++)
++
+ include(CMakePackageConfigHelpers)
+ write_basic_package_version_file(
+   "${PROJECT_BINARY_DIR}/cmake/faiss-config-version.cmake"
+--- /dev/null
++++ faiss/faiss/libfaiss.pc.in
+@@ -0,0 +1,9 @@
++prefix=@CMAKE_INSTALL_PREFIX@
++libdir=@CMAKE_INSTALL_FULL_LIBDIR@
++includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
++
++Name: @PROJECT_NAME@
++Description: @PROJECT_DESCRIPTION@
++Version: @PROJECT_VERSION@
++Libs: -L${libdir} -lfaiss
++Cflags: -I${includedir}

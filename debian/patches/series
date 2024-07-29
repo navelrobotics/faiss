@@ -8,3 +8,5 @@
 0008-Install-missing-header-file.patch
 0009-Fix-FTBFS-with-swig-4.2.0.patch
 0010-Big-endian-support.patch
+0011-Add-version-and-soname.patch
+0012-Add-pkg-config.patch
