@@ -1,3 +1,10 @@
+faiss (1.8.0-5+navel1) unstable; urgency=medium
+
+  * Build shared library with C and C++ headers
+  * Use OpenBLAS with OpenMP
+
+ -- navel robotics GmbH <debmaint@navelrobotics.com>  Tue, 06 Aug 2024 18:43:03 +0200
+
 faiss (1.8.0-5) unstable; urgency=medium
 
   * Team upload.
