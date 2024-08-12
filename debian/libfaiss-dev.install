@@ -1,4 +1,6 @@
 usr/include/faiss
 usr/lib/*/libfaiss.so
+usr/lib/*/libfaiss_c.so
 usr/lib/*/cmake/faiss
 usr/lib/*/pkgconfig/libfaiss.pc
+usr/lib/*/pkgconfig/libfaiss_c.pc

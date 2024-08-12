@@ -29,3 +29,15 @@
 +Version: @PROJECT_VERSION@
 +Libs: -L${libdir} -lfaiss
 +Cflags: -I${includedir}
+--- /dev/null
++++ b/c_api/libfaiss_c.pc.in
+@@ -0,0 +1,9 @@
++prefix=@CMAKE_INSTALL_PREFIX@
++libdir=@CMAKE_INSTALL_FULL_LIBDIR@
++includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
++
++Name: @PROJECT_NAME@
++Description: @PROJECT_DESCRIPTION@
++Version: @PROJECT_VERSION@
++Libs: -L${libdir} -lfaiss_c
++Cflags: -I${includedir}

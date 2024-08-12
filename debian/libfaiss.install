@@ -1,1 +1,2 @@
 usr/lib/*/libfaiss.so.*
+usr/lib/*/libfaiss_c.so.*
