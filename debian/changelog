@@ -1,3 +1,9 @@
+faiss (1.8.0-5+navel2) unstable; urgency=medium
+
+  * Build shared library for C API
+
+ -- navel robotics GmbH <debmaint@navelrobotics.com>  Mon, 12 Aug 2024 17:05:37 +0200
+
 faiss (1.8.0-5+navel1) unstable; urgency=medium
 
   * Build shared library with C and C++ headers
