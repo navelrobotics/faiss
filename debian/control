@@ -11,7 +11,8 @@ Build-Depends:
  cmake,
  debhelper-compat (= 13),
  libgtest-dev,
- libopenblas-openmp-dev,
+ libblas-dev,
+ liblapack-dev,
 Description: efficient similarity search and clustering of dense vectors
  Faiss is a library for efficient similarity search and clustering of dense
  vectors. It contains algorithms that search in sets of vectors of any size, up
@@ -27,7 +28,6 @@ Multi-Arch: same
 Depends:
  ${misc:Depends},
  ${shlibs:Depends},
- libopenblas0-openmp,
 Description: ${source:Synopsis}
  ${source:Extended-Description}
  .
